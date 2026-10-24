@@ -1,6 +1,7 @@
 # Event Buddy Finder: Project Proposal
 
 ## Project Introduction (@Irene)
+Event Buddy Finder is a social event-discovery platform for people across the Greater Toronto Area who want to explore local events and connect with others who share their interests. Individuals can browse a shared calendar of events grouped by category, location, attendance, and other details. Users can track events they are interested in, join event-specific group chats, and directly message people with similar interests. Registered groups can publish and update event listings, while administrator oversight helps keep information trustworthy. By combining event discovery with social interaction, Event Buddy Finder helps users make informed plans and find companions before attending an event.
 
 ## 1. Motivation (@Irene)
 
