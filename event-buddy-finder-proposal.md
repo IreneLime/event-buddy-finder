@@ -24,4 +24,8 @@ Existing applications often focus mainly on either finding events or meeting peo
 ## 3. Project Plan and Team Responsibilities (@Grace)
 
 ## 4. Initial Team Reasoning and AI-Assisted Exploration (@Irene)
+### 4.1 Initial Team Reasoning (@Irene)
+Our team initially identified a gap between discovering events and finding people with similar interests to attend them with. We proposed a React and TypeScript frontend connected through REST APIs to an Express and TypeScript backend, with Firebase providing email-verified authentication, and PostgreSQL for database. A relational database would store users, organizers, events, registrations, chat rooms, and messages as connected records. Our main open questions were how to implement real-time messaging and how to model these relationships so event, user, and chat data remain consistent, which requires detailed investigation and database structure planning.
 
+### 4.2 Exploration and Evaluation (@Irene)
+Through team discussion, we defined the application’s general structure, key user scenarios, frontend components, and initial backend logic. We also planned to use patterns from the course assignments and lectures as a baseline for organizing and developing the code. After establishing the feature requirements and initial design ourselves, we used AI primarily to track the project requirements while we refine detailed designs. Specifically, any detailed design suggestions were checked against our initial list of feature requirement before being incorporated into our design, ensuring that it does not conflict with the intended functionality or required technology stack.
