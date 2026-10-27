@@ -1,0 +1,98 @@
+2026-10-20 Meeting notes:
+Action items: 
+github repo creation (@Irene)
+discord repo (@grace)
+Project proposal cleanup
+introduction (@Irene)
+Motivation (@Irene)
+Objectives, Architecture, and Key Features 
+2.1 Objectives and Scope (@Grace)
+2.2 Architecture and Technology Stack + diagram (@cathy)
+2.3 Basic Features (@Bella)
+2.4 Advanced Features and Feasibility  (@Bella)
+2.5 End-to-End user Interaction Flow (@cathy)
+Project Plan and Team Responsibilities (@Grace)
+Initial Team Reasoning and AI-Assisted Exploration (@Irene)
+Next week plan: (next Tuesday) 
+Cathy will create a master doc with headings + draft PR with the codex version 
+Everyone should branch off from the main repo and create their own branch with their part of the proposal and create a PR for review for next week.
+We will merge the part next week in meetings and delegate team responsibility and polish it
+
+
+hi this is irene  here. might need to think about word count for each section so ai doesn’t produce an essay for each part lol
+I know this, we just need to use the skill /humanize and shorten the part + bullet point + tldr 
+smart ^_^
+2000 words so short
+keep the word count in mind 
+
+
+
+
+Project idea
+Event buddy finder
+Shared calendar
+Click on an event -> join groupchat or message someone
+Post events -> shows up on calendar in real time
+Register as an individual / group
+Individual can join events
+group can post events
+user authentication and authorization (email confirmation)
+realtime group chat feature
+
+
+Frontend (react)
+User profile page
+Profile pic
+name
+email (verified or not)
+age range
+preferences (keywords of event categories they like)
+User event history
+History of events you posted
+also events they are attending/registered in
+Event page
+View events by category
+View events by date (a calendar)
+Rating of each event
+Map
+events show up like “pins” on the map
+Backend
+List events
+pagination 
+create event 
+name
+date + time
+categories
+location
+description
+Notes
+Limit the number of events a person posts everyday
+Event needs to be verified by a “verified admin”
+update event
+should notify users that are already registered
+notification to users that are interested (as a chat feature “event bot - this event is updated”)
+login
+email
+password
+logout
+register user
+name
+email
+hobbies
+program of study?
+age
+gender
+Chat feature within an event listing page 
+within an event page, there will be a button that leads to a group chat feature where everyone can join the group and post stuff.
+Only people that are registered (email authenticated) then you could join and write/send messages
+Chat page 
+chat history include group you are enrolled in
+Map feature to show where events (filter with dates, event category, pricing, capacity, …)
+search bar
+
+user story
+registration (authenticate through firebase), app sends confirmation email to user
+user gets directed to complete user profile
+
+
+
