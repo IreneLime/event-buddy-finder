@@ -12,13 +12,13 @@
 
 ### 2.3 Basic Features (@Bella)
 
-**Accounts and Profiles:** Users can register with email verification, log in and out, and create profiles with a picture, name, academic program, and preferred event categories. Accounts have designated roles for individuals, registered groups, and administrators.
+**Accounts and Profiles:** Users can register with email verification, log in and out securely, and create profiles with a picture, name, and preferred event categories.
 
-**Event Discovery:** Users can browse paginated event listings, search by keywords, and filter by criterias such as event category or date. A shared calendar and event detail pages display details such as location, price, capacity, age restrictions, and accessibility.
+**Event Discovery:** Users can browse paginated event listings, search by keywords, and filter by criterias such as event category or date. A shared calendar and event detail pages display details such as location, price, and capacity.
 
-**Event Publishing and Moderation:** Users can create and edit events subject to daily posting limits. Administrators review submissions before publication to maintain reliable event information.
+**Event Publishing:** Users can create and edit events subject to daily posting limits.
 
-**Communication:** Users can access event-specific group chats, view message history, and receive automated notifications when event details change.
+**Communication:** Each event will have an associated group chat where users can discuss plans and connect with potential attendees. Users can view previous messages, exchange messages in real time, and receive notifications when event details change.
 
 **File Management:** Cloud storage supports uploading and retrieving profile pictures and event images linked to their corresponding records.
 
@@ -27,16 +27,15 @@
 
 **1. User Authentication and Authorization**
 
-The platform will support user registration and login, including email verification to ensure that users have authenticated email addresses. Authenticated users will be able to access protected features, such as joining event group chats and sending messages. The backend will verify authentication credentials or tokens and enforce access permissions through protected API endpoints.
+The platform will implement secure user registration, login, and email verification. Firebase Authentication will manage user identity and authentication sessions, while the backend will enforce access permissions for protected operations. Public visitors can browse event listings, whereas authenticated users with verified email addresses can access restricted features, including event creation and event group chats.
 
-This feature is feasible using established authentication frameworks such as Firebase, which can manage authentication flows and sessions. The team will integrate authentication with the application backend and database to associate users with their profiles, event participation, and messages. Authentication checks will ensure that unauthenticated visitors can browse publicly available event listings but cannot join group chats or send messages. This separation between public discovery and authenticated participation supports both usability and security.
+The backend will validate authentication tokens and verify user permissions before processing protected API requests. Role-based and resource-level authorization will ensure that users can only perform actions permitted by their roles and ownership. For example, users can edit or delete their own events but cannot modify events created by others. Similarly, only interested event attendees can access the corresponding event group chat and send messages.
 
 **2. Real-Time Functionality: Event Group Chats**
 
-The platform will provide a group chat feature accessible through a button on each event's listing page. Users interested in an event can open its associated chat to communicate with other users, discuss plans, ask questions, and find companions before attending. Only users with authenticated email addresses will be permitted to join chats and send messages. New messages will appear in real time without requiring users to refresh the page.
+Each event will have a dedicated group chat accessible through its event listing. Participants can use the chat to ask questions, coordinate attendance, and connect with others before an event. New messages will appear without requiring a page refresh, and previous conversations will remain available when users return to the chat, and would be accessible to new users to the chat.
 
-This feature will use Socket.IO to establish real-time communication between clients and the Express backend. When a user sends a message, the server will validate the user's authentication status and chat access before saving the message to PostgreSQL and broadcasting it to authorized participants in the corresponding chat room. Message history will be retrieved from the database when users open a chat, ensuring that previous conversations remain available even after they disconnect.
-
+Socket.IO will provide real-time communication between clients and the Express backend. When a user sends a message, the server will verify their authentication status and chat permissions, save the message in PostgreSQL, and broadcast it to authorized participants in the corresponding chat room. When users open a chat, the backend will retrieve its message history from the database.
 
 ### 2.5 End-to-End User Interaction Flow (@cathy)
 
