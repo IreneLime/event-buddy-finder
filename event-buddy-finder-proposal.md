@@ -14,7 +14,7 @@ Event Buddy Finder will have a React and TypeScript frontend, with a separate Ty
 
 #### Frontend
 
-- **Stack:** React and TypeScript, styled with Tailwind CSS and shadcn/ui (or a similar component library).
+- **Stack:** React and TypeScript, styled with Tailwind CSS and shadcn/ui.
 - **Interface:** A responsive calendar and event list with date, category, and location filters. Event pages show details, an “Interested” option, a “Request to Join” action, and event chat. The “Going” status appears after organizer approval.
 - **Communication:** The frontend uses REST for event and attendance requests. Socket.IO handles live chat and event alerts, so users see changes without refreshing the page.
 
