@@ -8,7 +8,7 @@
 
 ### 2.1 Objectives and Scope (@Grace)
 
-The objective of this project is to develop a web application that combines event discovery with social interaction, allowing users to post and find local events, companions, and coordinate participation. The platform will provide an event calendar with search and filtering options, event creation and management, participation requests, ratings, and event chat. Organizers can manage event listings and approve attendance requests, while administrators oversee event submissions to maintain reliable information.
+The objective of this project is to develop a web application that combines event discovery with social interaction, allowing users to post and find local events, companions, and coordinate participation. The platform will provide an event calendar with search and filtering options, event creation and management, participation requests, ratings, and event chat. Organizers can manage event listings and approve attendance requests.
 
 The project will focus on delivering a functional end-to-end workflow, from browsing events to connecting with other attendees. Advanced features will include authentication and real-time group chats. The implementation will use a React and TypeScript frontend connected to an Express backend, with PostgreSQL for structured data, Firebase for authentication, and Socket.IO for real-time interactions. Cloud storage will support profile pictures and event images. More complex functions such as waitlists, payment processing, and personalized recommendation will be outside the intial scope. 
 
