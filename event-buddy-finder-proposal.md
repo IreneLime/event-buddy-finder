@@ -20,22 +20,28 @@ Event Buddy Finder will have a React and TypeScript frontend, with a separate Ty
 
 #### Backend services
 
-- **Stack and API:** Express.js with TypeScript provides the backend. Its REST endpoints will be documented in a shared API contract.
-- **Services:** The event and participation service manages listings and join requests. The chat and notification service stores messages and sends event alerts. Both use one PostgreSQL deployment to keep related records consistent. Sharing a database ties the services to the same schema, so we’ll keep the design to these two services and skip a separate message broker.
-- **Authentication:** Firebase Authentication handles sign-in and email verification, so we don’t need to build our own password and verification flow. Each service checks Firebase ID tokens. Email verification is required to set up a profile and post an event. Signed-in users can show interest, chat, or request to attend; the event organizer approves or declines each request.
-- **Statuses:** Events are `scheduled` or `cancelled`. A user’s participation is `interested`, `pending_approval`, `going`, `declined`, or `cancelled`. Joining an event chat marks the user as interested. A request to attend stays pending until the organizer decides; approval changes it to `going`. Keeping event status separate from attendance status makes it clear who should receive event alerts.
+- **Stack and API:** The backend will be implemented in Express.js and TypeScript, with documented REST endpoints for communication with the React frontend.
+- **Services:** The backend will include an event and participation service for event listings and attendance requests, and a chat and notification service for messages and event alerts. Both services will use a shared PostgreSQL deployment to maintain consistency across related records. This simplifies cross-service data access but couples the services through a shared schema; limiting the design to two services avoids the additional complexity of a message broker.
+- **Authentication:** Firebase Authentication will support sign-in and email verification. Each service will validate Firebase ID tokens before allowing protected actions. Email verification will be required to create a profile and post an event. Signed-in users can express interest, use event chats, or request to attend; the event organizer can approve or decline each request.
+- **Statuses:** Events will have a `scheduled` or `cancelled` status. A separate user–event participation record will track `interested`, `pending_approval`, `going`, `declined`, or `cancelled`. Joining an event chat records interest. Attendance requests remain pending until the organizer approves or declines them; approval changes the status to `going`. For group-posted events, an authorized group organizer can manage the listing and decide attendance requests.
 
 #### Database and file storage
 
-- **PostgreSQL:** The database stores users and profiles, events, event participation, chat messages, and notifications. The `event_participants` table links users to events and records interest or attendance status; messages and notifications link back to the relevant users and events. PostgreSQL suits these related records.
+- **PostgreSQL:** The database stores users and profiles, groups, group memberships, events, event participation, chat messages, and notifications. A `groups` table represents registered groups, while `group_members` links users to groups and records each member’s role. Each event records its creator and, when posted on behalf of a group, the organizing group. The event service checks group membership and role before allowing members to post or manage that group’s events. The `event_participants` table links users to events and records interest or attendance status; messages and notifications link back to the relevant users and events.
 - **Cloud storage:** We propose a DigitalOcean Spaces bucket for profile pictures and event images. The backend uploads the image to Spaces and saves its object key or URL in the related PostgreSQL record. The image itself stays in cloud storage, rather than in the database. Spaces is the object-storage service used as an example in the course and has an S3-compatible API.
-- **Data access:** The event service handles event and attendance records. The chat and notification service handles messages and alerts. Both use the documented backend APIs and PostgreSQL records.
+- **Data access:** The event service handles group membership, event, and attendance records; it checks a member’s role before group event operations. The chat and notification service handles messages and alerts. Both use the documented backend APIs and PostgreSQL records.
+
+#### Design rationale and security
+
+We chose a separate React frontend and Express backend to keep the user interface and API responsibilities distinct and to support parallel frontend and backend development. Compared with a Next.js full-stack design, this requires more API coordination and authentication integration. PostgreSQL was selected over SQLite because users, groups, events, attendance, and messages have linked records that benefit from relational constraints and transactions. A server-based database also fits the two backend services, though using one shared schema couples them.
+
+Security is a project risk because Firebase verifies identity but application-specific permissions remain the backend’s responsibility. Both services will validate Firebase ID tokens and check access to protected actions, including group event management, chat, and attendance decisions. As a course prototype, the project will focus on these access controls rather than advanced abuse detection or a formal security audit.
 
 #### Real-time notifications
 
 When an event changes or is cancelled, the backend saves an alert for interested users and people whose join requests are pending or approved. Socket.IO delivers it to users who are online, and the app keeps it for people who reconnect later. The frontend refreshes the event and shows an in-app alert, with an optional browser notification if the user allows it.
 
-This design uses the required course stack and includes authentication and real-time features. The first version focuses on finding and posting events, requesting and approving attendance, and chatting. Firebase, one PostgreSQL deployment, and two backend services keep the work manageable.
+The proposed architecture incorporates the required course technologies and supports two advanced features: authenticated access and real-time chat and event notifications. To keep the project achievable within the course timeline, the initial implementation will focus on event discovery and posting, attendance requests and approvals, and event-based communication. Firebase Authentication, a single PostgreSQL deployment, and two focused backend services provide the required capabilities with a limited infrastructure footprint.
 
 ```
   +----------------------------------------+
@@ -65,7 +71,8 @@ This design uses the required course stack and includes authentication and real-
        +-- (4a) SQL queries and updates --> +------------------------------+
        |                                    | DATABASE                     |
        |                                    | PostgreSQL                   |
-       |                                    | users, events, participation,|
+       |                                    | users, groups, memberships,  |
+       |                                    | events, participation,       |
        |                                    | messages, notifications      |
        |                                    +------------------------------+
        +-- (4b) Store/retrieve files -----------------------> DigitalOcean Spaces
@@ -74,7 +81,7 @@ This design uses the required course stack and includes authentication and real-
   Frontend <--- (6) Live chat and event update/cancellation alerts --- Backend (Socket.IO)
 ```
 
-**How the pieces interact:** (1) Users sign in with Firebase and verify their email when setting up a profile or posting an event. (2) The frontend sends Firebase ID tokens with protected REST requests and its Socket.IO connection; public browsing remains available without signing in. (3) The backend checks tokens before allowing protected actions. (4) The event service stores events and attendance in PostgreSQL; the chat service stores messages and alerts there. Images go to DigitalOcean Spaces, with their keys or URLs saved in PostgreSQL. (5) REST responses return requested data to the frontend. (6) Socket.IO delivers live chat and event alerts to connected users, and the app refreshes the event view.
+**How the pieces interact:** Users authenticate with Firebase and verify their email to create a profile or post an event, while public event browsing remains available without signing in. For protected REST requests and Socket.IO connections, the frontend sends a Firebase ID token, which the backend validates before allowing the action. The event service stores listings and attendance in PostgreSQL, while the chat service stores messages and alerts there. Uploaded images are stored in DigitalOcean Spaces, with their object keys or URLs saved in PostgreSQL. REST responses return requested data to the frontend, and Socket.IO delivers live messages and event alerts so connected users can see updates without refreshing.
 
 ### 2.3 Basic Features (@Bella)
 
@@ -95,7 +102,8 @@ VISITOR FLOW
       |     Register / sign in --> Verify email --> Complete profile
       |                                             |
       |                                             v
-      |                                      Post event --> Save in PostgreSQL
+      |                                      Post as individual or group member
+      |                                                   --> Save in PostgreSQL
       |                                                     and image in cloud
       |                                                     storage --> Public listing
       |
@@ -135,7 +143,7 @@ CANCELLATION / EVENT UPDATE NOTIFICATION FLOW
 
 1. Visitors can browse the event calendar and filter public listings by date, category, or location without signing in.
 2. To create a profile or post an event, a user signs up through Firebase Authentication and verifies their email. Signed-in users can also show interest, request to attend, or enter an event chat.
-3. A verified user posts an event with its title, description, time, location, category, and optional image. The backend saves the details in PostgreSQL and uploads the image to cloud storage; the listing then appears publicly.
+3. A verified user posts an event individually or on behalf of a group they are authorized to represent. The backend saves the event details in PostgreSQL and uploads any image to cloud storage; the listing then appears publicly.
 4. A signed-in user can mark themselves as interested in an event or join its chat; joining the chat also records interest. To attend, they request to join. The request stays `pending_approval` until the event organizer approves it, setting the user’s status to `going`, or declines it.
 5. When an event changes or is cancelled, the backend alerts interested users and people with pending or approved join requests. It saves notifications in PostgreSQL and sends live Socket.IO alerts to connected users. The frontend refreshes the event and shows an in-app alert, or a browser notification if the user has allowed them. Saved alerts are available when users return.
 
