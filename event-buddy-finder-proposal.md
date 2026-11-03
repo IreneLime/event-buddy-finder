@@ -12,18 +12,20 @@
 
 ### 2.3 Basic Features (@Bella)
 
-**Accounts and Profiles:** Users can register with email verification, log in and out securely, and create profiles with a picture, name, and preferred event categories.
+Event Buddy Finder supports the complete user journey, from discovering an event to communicating with potential attendees and preparing to participate.
 
-**Event Discovery:** Users can browse paginated event listings, search by keywords, and filter by criterias such as event category or date. A shared calendar and event detail pages display details such as location, price, and capacity.
+**User Profile Management:** Upon registration, users can create profiles with a picture, name, and preferred event categories. These preferences help personalize the event discovery experience and allow users to identify others with similar interests.
 
-**Event Publishing:** Users can create and edit events subject to daily posting limits.
+**Event Discovery and Search:** Users can browse paginated event listings, search by keywords, and filter by criteria such as event category or date. A shared calendar provides an additional way to explore upcoming events and understand when activities are taking place. These discovery tools help users identify events that match their interests, preferences, and availability.
 
-**Communication:** Each event will have an associated group chat where users can discuss plans and connect with potential attendees. Users can view previous messages, exchange messages in real time, and receive notifications when event details change.
+**Event Creation and Management:** Registered users can create and edit events. Daily event posting limits will also be implemented to discourage spam and prevent excessive event creation. 
 
-**File Management:** Cloud storage supports uploading and retrieving profile pictures and event images linked to their corresponding records.
+**File Management:** Cloud storage supports uploading and retrieving user profile pictures and event images. Uploaded files are associated with their corresponding user or event records. Cloud-based storage also separates file management from the main application database, allowing the platform to manage images efficiently without storing large binary files directly in PostgreSQL.
 
 
-### 2.4 Advanced Features and Feasibility (@Bella)
+### 2.4 Advanced Features (@Bella)
+
+The following advanced features extend the basic functionality of Event Buddy Finder while supporting its main objective of connecting people through shared event interests.
 
 **1. User Authentication and Authorization**
 
