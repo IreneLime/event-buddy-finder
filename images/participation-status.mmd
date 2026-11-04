@@ -1,0 +1,8 @@
+stateDiagram-v2
+    direction LR
+    [*] --> interested: mark Interested / join chat
+    interested --> pending_approval: request to join
+    pending_approval --> going: organizer approves
+    pending_approval --> declined: organizer declines
+    going --> cancelled: cancel participation
+    pending_approval --> cancelled: cancel participation

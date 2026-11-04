@@ -1,0 +1,26 @@
+%%{init: {"flowchart": {"nodeSpacing": 60, "rankSpacing": 70}}}%%
+flowchart TB
+    subgraph CLIENT["Client and Identity"]
+        direction LR
+        FE["<b>Frontend</b><br/>React + TypeScript<br/>Tailwind CSS + shadcn/ui"]
+        FB["<b>Firebase Authentication</b><br/>sign-up, login, email verification<br/>issues + verifies ID tokens"]
+        FE -- "(1) sign in, get ID token" --> FB
+    end
+
+    subgraph BE["Backend: Express + TypeScript (validates Firebase ID token)"]
+        direction LR
+        EV["<b>Event & Participation Service</b><br/>REST API"]
+        CH["<b>Chat & Notification Service</b><br/>Socket.IO: group chats,<br/>direct messages, alerts"]
+    end
+
+    subgraph DATA["Data"]
+        direction LR
+        DB[("<b>PostgreSQL</b><br/>users, groups, events,<br/>participation, messages, notifications")]
+        SP[("<b>DigitalOcean Spaces</b><br/>profile & event images")]
+    end
+
+    FE -- "(2) REST + ID token" --> EV
+    FE <-->|"(3) WebSocket + ID token"| CH
+    EV -- "(4) SQL" --> DB
+    CH -- "(4) SQL" --> DB
+    EV -- "(5) upload / fetch images" --> SP
