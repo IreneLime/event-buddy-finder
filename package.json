@@ -1,0 +1,20 @@
+{
+  "name": "event-buddy-finder",
+  "private": true,
+  "engines": {
+    "node": ">=20.19.0",
+    "pnpm": ">=11"
+  },
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "concurrently -k -n web,events,chat -c cyan,green,magenta \"pnpm --filter @event-buddy/web dev\" \"pnpm --filter @event-buddy/events-api dev\" \"pnpm --filter @event-buddy/chat-api dev\"",
+    "dev:web": "pnpm --filter @event-buddy/web dev",
+    "dev:events": "pnpm --filter @event-buddy/events-api dev",
+    "dev:chat": "pnpm --filter @event-buddy/chat-api dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.7"
+  }
+}
