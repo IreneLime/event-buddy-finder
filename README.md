@@ -6,13 +6,14 @@ Event Buddy Finder is a course project for discovering local events and finding 
 
 ```text
 apps/web/                  React + TypeScript frontend
+services/auth-api/         Express + TypeScript auth/profile service shell
 services/events-api/       Express + TypeScript event service shell
 services/chat-api/         Express + TypeScript chat/notification service shell
 packages/contracts/        Shared TypeScript domain and API types
 database/migrations/       PostgreSQL schema draft
 ```
 
-The frontend currently uses local mock data. The two Express services expose health checks only; business endpoints, authentication, PostgreSQL access, Socket.IO, and cloud storage will be added in later work.
+The frontend currently uses local mock data. The three Express services expose health checks only; Firebase token validation, profile/event endpoints, PostgreSQL access, Socket.IO, and cloud storage will be added in later work.
 
 ## Get started
 
@@ -23,9 +24,9 @@ pnpm install
 pnpm dev
 ```
 
-The frontend runs at `http://localhost:5173`, the event service at `http://localhost:4001`, and the chat/notification service at `http://localhost:4002`. Health checks are available at `/health` on each service.
+The frontend runs at `http://localhost:5173`, the auth/profile service at `http://localhost:4003`, the event service at `http://localhost:4001`, and the chat/notification service at `http://localhost:4002`. Health checks are available at `/health` on each service.
 
-Run just one app with `pnpm dev:web`, `pnpm dev:events`, or `pnpm dev:chat`. Use `pnpm build` and `pnpm typecheck` before opening a pull request.
+Run just one app with `pnpm dev:web`, `pnpm dev:auth`, `pnpm dev:events`, or `pnpm dev:chat`. Use `pnpm build` and `pnpm typecheck` before opening a pull request.
 
 ## Frontend routes
 

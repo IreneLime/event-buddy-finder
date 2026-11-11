@@ -7,8 +7,9 @@
   },
   "packageManager": "pnpm@11.25.0",
   "scripts": {
-    "dev": "concurrently -k -n web,events,chat -c cyan,green,magenta \"pnpm --filter @event-buddy/web dev\" \"pnpm --filter @event-buddy/events-api dev\" \"pnpm --filter @event-buddy/chat-api dev\"",
+    "dev": "concurrently -k -n web,auth,events,chat -c cyan,yellow,green,magenta \"pnpm --filter @event-buddy/web dev\" \"pnpm --filter @event-buddy/auth-api dev\" \"pnpm --filter @event-buddy/events-api dev\" \"pnpm --filter @event-buddy/chat-api dev\"",
     "dev:web": "pnpm --filter @event-buddy/web dev",
+    "dev:auth": "pnpm --filter @event-buddy/auth-api dev",
     "dev:events": "pnpm --filter @event-buddy/events-api dev",
     "dev:chat": "pnpm --filter @event-buddy/chat-api dev",
     "build": "pnpm -r build",
