@@ -2,6 +2,8 @@ export type EventStatus = 'scheduled' | 'cancelled'
 
 export type ParticipationStatus = 'interested' | 'going' | 'withdrawn'
 
+export type AgeRange = 'under_18' | '18_24' | '25_34' | '35_44' | '45_plus'
+
 export interface EventSummary {
   id: string
   title: string
@@ -24,10 +26,43 @@ export interface UserProfile {
   id: string
   displayName: string
   affiliation?: string
-  ageRange?: 'under_18' | '18_24' | '25_34' | '35_44' | '45_plus'
+  ageRange?: AgeRange
   bio?: string
   profileImageUrl?: string
   preferredCategories: string[]
+}
+
+export interface CurrentUserProfile extends UserProfile {
+  email: string
+  profileCompleted: boolean
+}
+
+export interface CreateProfileRequest {
+  displayName: string
+  affiliation?: string | null
+  ageRange?: AgeRange | null
+  bio?: string | null
+  preferredCategories?: string[]
+}
+
+export interface UpdateProfileRequest {
+  displayName?: string
+  affiliation?: string | null
+  ageRange?: AgeRange | null
+  bio?: string | null
+  preferredCategories?: string[]
+}
+
+export interface ProfileValidationResponse {
+  valid: true
+  profile: CreateProfileRequest & { preferredCategories: string[] }
+}
+
+export interface UserEventHistoryResponse {
+  items: EventSummary[]
+  page: number
+  limit: number
+  total: number
 }
 
 export interface ChatMessage {
