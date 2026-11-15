@@ -30,6 +30,10 @@ export interface UserProfile {
   preferredCategories: string[]
 }
 
+export interface ImageResponse {
+  imageUrl: string
+}
+
 export interface ChatMessage {
   id: string
   conversationId: string
