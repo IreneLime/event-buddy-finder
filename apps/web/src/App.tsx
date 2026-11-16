@@ -7,22 +7,25 @@ import { EventFormPage } from './pages/event-form-page'
 import { EventsPage } from './pages/events-page'
 import { LoginPage } from './pages/login-page'
 import { ProfilePage } from './pages/profile-page'
+import { AuthProvider, RequireAuth } from './state/auth-store'
+import { ExploreCityProvider } from './state/explore-city'
+import { HomePage } from './pages/home-page'
 
 export default function App() {
-  return <EventStoreProvider><BrowserRouter><Routes>
+  return <AuthProvider><EventStoreProvider><BrowserRouter><Routes>
     <Route path="/login" element={<LoginPage />} />
-    <Route element={<AppShell />}>
-      <Route index element={<Navigate to="/events" replace />} />
+    <Route element={<ExploreCityProvider><AppShell /></ExploreCityProvider>}>
+      <Route index element={<HomePage />} />
       <Route path="events" element={<EventsPage />} />
-      <Route path="events/new" element={<EventFormPage />} />
-      <Route path="events/:eventId/edit" element={<EventFormPage />} />
+      <Route path="events/new" element={<RequireAuth><EventFormPage /></RequireAuth>} />
+      <Route path="events/:eventId/edit" element={<RequireAuth><EventFormPage /></RequireAuth>} />
       <Route path="events/:eventId" element={<EventDetailPage />} />
       <Route path="chats" element={<ChatsPage />} />
       <Route path="chats/:conversationId" element={<ChatPage />} />
       <Route path="profile" element={<ProfilePage />} />
-      <Route path="profile/edit" element={<ProfilePage />} />
+      <Route path="profile/edit" element={<RequireAuth><ProfilePage /></RequireAuth>} />
       <Route path="profile/:userId" element={<ProfilePage />} />
-      <Route path="*" element={<Navigate to="/events" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
-  </Routes></BrowserRouter></EventStoreProvider>
+  </Routes></BrowserRouter></EventStoreProvider></AuthProvider>
 }
