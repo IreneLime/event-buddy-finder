@@ -7,14 +7,15 @@
   },
   "packageManager": "pnpm@11.25.0",
   "scripts": {
-    "dev": "concurrently -k -n web,auth,users,events,chat -c cyan,yellow,blue,green,magenta \"pnpm --filter @event-buddy/web dev\" \"pnpm --filter @event-buddy/auth-api dev\" \"pnpm --filter @event-buddy/user-api dev\" \"pnpm --filter @event-buddy/events-api dev\" \"pnpm --filter @event-buddy/chat-api dev\"",
+    "dev": "concurrently -k -n web,auth,users,events,chat,images -c cyan,yellow,blue,green,magenta,red \"pnpm --filter @event-buddy/web dev\" \"pnpm --filter @event-buddy/auth-api dev\" \"pnpm --filter @event-buddy/user-api dev\" \"pnpm --filter @event-buddy/events-api dev\" \"pnpm --filter @event-buddy/chat-api dev\" \"pnpm --filter @event-buddy/image-api dev\"",
     "dev:web": "pnpm --filter @event-buddy/web dev",
     "dev:auth": "pnpm --filter @event-buddy/auth-api dev",
     "dev:users": "pnpm --filter @event-buddy/user-api dev",
     "dev:events": "pnpm --filter @event-buddy/events-api dev",
     "dev:chat": "pnpm --filter @event-buddy/chat-api dev",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "dev:images": "pnpm --filter @event-buddy/image-api dev"
   },
   "devDependencies": {
     "concurrently": "^10.0.7"

@@ -81,3 +81,7 @@ export interface NotificationItem {
   createdAt: string
   readAt?: string
 }
+
+export interface ImageResponse {
+  imageUrl: string
+}
