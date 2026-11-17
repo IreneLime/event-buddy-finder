@@ -16,7 +16,7 @@ packages/storage/          Shared DigitalOcean Spaces-compatible client
 database/migrations/       PostgreSQL schema draft
 ```
 
-The frontend currently uses local mock data. The user service implements PostgreSQL-backed profile endpoints and delegates Bearer-token verification to the auth service. The image service uploads profile and event images to DigitalOcean Spaces. Event and chat integration continues in separate feature work.
+Event discovery, editing, cancellation, and participation use the PostgreSQL-backed events API. Event alerts are persisted transactionally and delivered through Socket.IO, with a saved notification inbox and optional browser alerts. Chat messages and the demo login still use their local prototype adapters. See [real-time event notifications](docs/realtime-event-notifications.md) for setup and validation.
 
 ## Get started
 
@@ -38,9 +38,10 @@ Run just one app with `pnpm dev:web`, `pnpm dev:auth`, `pnpm dev:users`, `pnpm d
 - `/events/:eventId` — event details and interest/going controls
 - `/events/new` and `/events/:eventId/edit` — shared create/edit event form
 - `/chats` and `/chats/:conversationId` — conversation list and chat view
+- `/notifications` — saved event alerts, unread filter, and browser notification settings
 - `/profile` and `/profile/:userId` — profile view; edit profile is linked from the current user's page
 
-Attendance and chat actions currently update local component state only. They do not persist across reloads or call the backend.
+Event participation and notifications persist in PostgreSQL. Chat messages use the running chat service's memory store.
 
 ## Contributing
 

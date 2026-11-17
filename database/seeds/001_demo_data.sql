@@ -41,6 +41,16 @@ WHERE NOT EXISTS (
     AND existing.starts_at = seed.starts_at
 );
 
+-- Preserve the public URLs used by the frontend and chat demo fixtures.
+UPDATE events event SET public_id = seed.public_id
+FROM (VALUES
+  ('night-market', 'Lanterns & Late Bites', 'demo-mina'),
+  ('flower-market', 'Saturday Flower Market & Coffee', 'demo-nadia'),
+  ('salsa-social', 'Beginner Salsa Social', 'demo-alex'),
+  ('lakeside-hangout', 'Lakeside Walk & Hot Chocolate', 'demo-mina')
+) AS seed(public_id, title, owner)
+WHERE event.title = seed.title AND event.created_by_user_id = seed.owner AND event.public_id IS NULL;
+
 INSERT INTO event_categories (event_id, category_id)
 SELECT event.id, category.id
 FROM (VALUES

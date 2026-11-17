@@ -30,16 +30,16 @@ export async function setParticipation(
   }
 
   if (status === 'going' && event.capacity !== null) {
-    const current = await participationRepository.getParticipation(eventId, userId)
+    const current = await participationRepository.getParticipation(event.id, userId)
     if (current?.status !== 'going') {
-      const goingCount = await participationRepository.countGoing(eventId)
+      const goingCount = await participationRepository.countGoing(event.id)
       if (goingCount >= event.capacity) {
         throw new ApiError(409, 'Event is at capacity')
       }
     }
   }
 
-  await participationRepository.upsertParticipation(eventId, userId, status)
+  await participationRepository.upsertParticipation(event.id, userId, status)
   return getEvent(eventId, userId)
 }
 
@@ -52,7 +52,7 @@ export async function listParticipants(
     throw new ApiError(404, 'Event not found')
   }
 
-  const { rows, total } = await participationRepository.listParticipants(eventId, {
+  const { rows, total } = await participationRepository.listParticipants(event.id, {
     status: query.status,
     page: query.page,
     limit: query.limit,

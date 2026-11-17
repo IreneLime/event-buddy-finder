@@ -37,6 +37,7 @@ async function main() {
       ? await prisma.event.update({
         where: { id: existing.id },
         data: {
+          publicId: data.key,
           description: data.description,
           notes: data.notes,
           endsAt: new Date(data.endsAt),
@@ -52,6 +53,7 @@ async function main() {
         data: {
           createdByUserId: data.owner,
           title: data.title,
+          publicId: data.key,
           description: data.description,
           notes: data.notes,
           startsAt: new Date(data.startsAt),

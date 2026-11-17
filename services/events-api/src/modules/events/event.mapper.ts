@@ -4,6 +4,9 @@ export interface EventRow {
   id: string | number
   title: string
   description: string
+  notes: string | null
+  city: string
+  created_by_user_id: string
   starts_at: Date | string
   ends_at: Date | string | null
   location_name: string
@@ -42,6 +45,9 @@ export function mapEventRow(row: EventRow): EventSummary {
     id: String(row.id),
     title: row.title,
     description: row.description,
+    notes: row.notes ?? undefined,
+    city: row.city,
+    organizerUserId: row.created_by_user_id,
     startsAt: toIso(row.starts_at),
     ...(endsAt ? { endsAt } : {}),
     locationName: row.location_name,

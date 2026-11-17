@@ -1,12 +1,16 @@
 import type { PoolClient } from 'pg'
 
 import { pool } from '../../db/pool.js'
+import { ApiError } from '../../utils/ApiError.js'
 import type { CreateEventBody, EventListQueryInput, UpdateEventBody } from './event.validation.js'
 import type { EventRow } from './event.mapper.js'
 
 const EVENT_SELECT = `
   SELECT
-    e.id,
+    COALESCE(e.public_id, e.id::text) AS id,
+    e.created_by_user_id,
+    e.notes,
+    e.city,
     e.title,
     e.description,
     e.starts_at,
@@ -111,13 +115,14 @@ export async function listEvents(
     LIMIT ${limitParam} OFFSET ${offsetParam}
   `
 
-  // Count reuses the same filter parameter indexes ($2+); $1 viewer is unused but kept for alignment.
+  // The count has no viewer join, so its filter parameters start at $1.
+  const countWhereClause = whereClause.replace(/\$(\d+)/g, (_match, index) => `$${Number(index) - 1}`)
   const countSql = `
     SELECT COUNT(*)::int AS total
     FROM events e
-    ${whereClause}
+    ${countWhereClause}
   `
-  const countValues = values.slice(0, values.length - 2)
+  const countValues = values.slice(1, values.length - 2)
 
   const [listResult, countResult] = await Promise.all([
     pool.query<EventRow>(listSql, values),
@@ -137,7 +142,7 @@ export async function getEventById(
   const result = await pool.query<EventRow>(
     `
       ${EVENT_SELECT}
-      WHERE e.id = $2
+      WHERE (e.id::text = $2 OR e.public_id = $2)
     `,
     [viewerUserId ?? null, eventId],
   )
@@ -149,7 +154,7 @@ export async function getEventOwnership(eventId: string): Promise<EventOwnership
     `
       SELECT id::text, created_by_user_id, organizing_group_id::text, status, starts_at, ends_at, capacity
       FROM events
-      WHERE id = $1
+      WHERE id::text = $1 OR public_id = $1
     `,
     [eventId],
   )
@@ -232,9 +237,11 @@ export async function createEvent(creatorId: string, body: CreateEventBody): Pro
           longitude,
           price_amount,
           capacity,
-          image_object_key
+          image_object_key,
+          notes,
+          city
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING id::text
       `,
       [
@@ -251,6 +258,8 @@ export async function createEvent(creatorId: string, body: CreateEventBody): Pro
         body.priceAmount ?? null,
         body.capacity ?? null,
         body.imageObjectKey ?? null,
+        body.notes ?? null,
+        body.city ?? 'Toronto',
       ],
     )
 
@@ -267,66 +276,58 @@ export async function createEvent(creatorId: string, body: CreateEventBody): Pro
   }
 }
 
-export async function updateEvent(eventId: string, body: UpdateEventBody): Promise<void> {
+export async function updateEvent(eventId: string, body: UpdateEventBody, actorUserId: string): Promise<void> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-
-    const sets: string[] = []
-    const values: unknown[] = []
-
-    const push = (column: string, value: unknown) => {
-      values.push(value)
-      sets.push(`${column} = $${values.length}`)
-    }
-
-    if (body.title !== undefined) push('title', body.title)
-    if (body.description !== undefined) push('description', body.description)
-    if (body.startsAt !== undefined) push('starts_at', body.startsAt)
-    if (body.endsAt !== undefined) push('ends_at', body.endsAt)
-    if (body.locationName !== undefined) push('location_name', body.locationName)
-    if (body.address !== undefined) push('address', body.address)
-    if (body.latitude !== undefined) push('latitude', body.latitude)
-    if (body.longitude !== undefined) push('longitude', body.longitude)
-    if (body.priceAmount !== undefined) push('price_amount', body.priceAmount)
-    if (body.capacity !== undefined) push('capacity', body.capacity)
-    if (body.organizingGroupId !== undefined) push('organizing_group_id', body.organizingGroupId)
-    if (body.imageObjectKey !== undefined) push('image_object_key', body.imageObjectKey)
-
-    if (sets.length > 0) {
-      sets.push('updated_at = NOW()')
-      values.push(eventId)
-      await client.query(
-        `UPDATE events SET ${sets.join(', ')} WHERE id = $${values.length}`,
-        values,
-      )
-    }
-
+    await client.query("SELECT set_config('app.actor_user_id', $1, true)", [actorUserId])
+    const locked = await client.query<{ status: string }>('SELECT status FROM events WHERE id = $1 FOR UPDATE', [eventId])
+    if (locked.rows[0]?.status === 'cancelled') throw new ApiError(400, 'Cancelled events cannot be updated')
     if (body.categoryNames) {
       const categoryIds = await resolveCategoryIds(client, body.categoryNames)
-      await replaceEventCategories(client, eventId, categoryIds)
+      const previous = await client.query<{ category_id: string }>('SELECT category_id::text FROM event_categories WHERE event_id = $1', [eventId])
+      const before = previous.rows.map((row) => row.category_id).sort().join(',')
+      const after = [...new Set(categoryIds.map(String))].sort().join(',')
+      if (before !== after) {
+        await replaceEventCategories(client, eventId, categoryIds)
+        await client.query("SELECT set_config('app.event_categories_changed', 'true', true)")
+      }
     }
 
-    // TODO(Grace): notify interested/going participants of event updates
+    const columns: Record<string, string> = {
+      title: 'title', description: 'description', notes: 'notes', city: 'city',
+      startsAt: 'starts_at', endsAt: 'ends_at', locationName: 'location_name', address: 'address',
+      latitude: 'latitude', longitude: 'longitude', priceAmount: 'price_amount', capacity: 'capacity',
+      organizingGroupId: 'organizing_group_id', imageObjectKey: 'image_object_key',
+    }
+    const sets: string[] = []
+    const values: unknown[] = []
+    for (const [field, column] of Object.entries(columns)) {
+      const value = body[field as keyof UpdateEventBody]
+      if (value !== undefined) { values.push(value); sets.push(`${column} = $${values.length}`) }
+    }
+    sets.push('updated_at = NOW()')
+    values.push(eventId)
+    await client.query(`UPDATE events SET ${sets.join(', ')} WHERE id = $${values.length}`, values)
     await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')
     throw error
-  } finally {
-    client.release()
-  }
+  } finally { client.release() }
 }
 
-export async function cancelEvent(eventId: string): Promise<void> {
-  await pool.query(
-    `
-      UPDATE events
-      SET status = 'cancelled', cancelled_at = NOW(), updated_at = NOW()
-      WHERE id = $1 AND status = 'scheduled'
-    `,
-    [eventId],
-  )
-  // TODO(Grace): notify interested/going participants of cancellation
+export async function cancelEvent(eventId: string, actorUserId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query("SELECT set_config('app.actor_user_id', $1, true)", [actorUserId])
+    await client.query(`UPDATE events SET status = 'cancelled', cancelled_at = NOW(), updated_at = NOW()
+      WHERE id = $1 AND status = 'scheduled'`, [eventId])
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally { client.release() }
 }
 
 export async function listCategories(): Promise<{ id: string; name: string }[]> {

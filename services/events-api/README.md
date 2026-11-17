@@ -23,7 +23,7 @@ Express + TypeScript service for event discovery, management, and participation.
 pnpm --filter @event-buddy/events-api dev
 ```
 
-Requires PostgreSQL with [database/migrations/001_initial_schema.sql](../../database/migrations/001_initial_schema.sql) applied.
+Requires PostgreSQL with migrations 001–003 applied. Event edits/cancellations save recipient alerts and an outbox transactionally; chat-api delivers them over Socket.IO. See [real-time event notifications](../../docs/realtime-event-notifications.md).
 
 ### Auth
 

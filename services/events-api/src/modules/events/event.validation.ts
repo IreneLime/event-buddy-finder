@@ -3,7 +3,7 @@ import { z } from 'zod'
 const isoDateTime = z.string().datetime({ offset: true })
 
 export const eventIdParamSchema = z.object({
-  id: z.string().regex(/^\d+$/, 'Event id must be a positive integer'),
+  id: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,149}$/, 'Invalid event id'),
 })
 
 export const eventListQuerySchema = z.object({
@@ -23,6 +23,8 @@ export const createEventBodySchema = z
   .object({
     title: z.string().trim().min(1).max(200),
     description: z.string().trim().min(1).max(10_000),
+    notes: z.string().trim().max(1_000).optional(),
+    city: z.string().trim().min(1).max(100).optional(),
     startsAt: isoDateTime,
     endsAt: isoDateTime.optional(),
     locationName: z.string().trim().min(1).max(300),
@@ -49,6 +51,8 @@ export const updateEventBodySchema = z
   .object({
     title: z.string().trim().min(1).max(200).optional(),
     description: z.string().trim().min(1).max(10_000).optional(),
+    notes: z.string().trim().max(1_000).nullable().optional(),
+    city: z.string().trim().min(1).max(100).optional(),
     startsAt: isoDateTime.optional(),
     endsAt: isoDateTime.nullable().optional(),
     locationName: z.string().trim().min(1).max(300).optional(),
