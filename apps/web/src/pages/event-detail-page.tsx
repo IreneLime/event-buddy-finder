@@ -17,23 +17,42 @@ export function EventDetailPage() {
   const { eventId = '' } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { getEvent, setParticipation } = useEventStore()
+  const { getEvent, setParticipation, cancelEvent, loading, error: loadError, refresh } = useEventStore()
   const event = getEvent(eventId)
   const [toast, setToast] = useState('')
+  const [working, setWorking] = useState(false)
+  const [error, setError] = useState('')
+  const [confirmCancel, setConfirmCancel] = useState(false)
+
+  if (loading) return <p role="status" className="p-10 text-center">Loading event…</p>
+  if (loadError) return <div role="alert" className="p-10 text-center">{loadError}<Button onClick={() => void refresh()}>Retry</Button></div>
 
   if (!event) return <div className="mx-auto max-w-xl py-20 text-center"><p className="text-lg font-bold">We couldn't find that event.</p><Button asChild variant="secondary" className="mt-5"><Link to="/events"><ArrowLeft size={15} />Back to events</Link></Button></div>
 
-  const canChat = Boolean(user) && (event.viewerParticipation === 'interested' || event.viewerParticipation === 'going')
-  const chooseParticipation = (status: 'interested' | 'going' | undefined) => {
-    setParticipation(event.id, status)
-    setToast(status ? `You're marked ${status} for this event.` : 'Your event status has been cleared.')
-    window.setTimeout(() => setToast(''), 2400)
+  const canManage = Boolean(user && (event.organizerUserId === user.id || (import.meta.env.DEV && event.organizerUserId === `demo-${user.id}`)))
+  const canChat = event.status !== 'cancelled' && Boolean(user) && (event.viewerParticipation === 'interested' || event.viewerParticipation === 'going')
+  const chooseParticipation = async (status: 'interested' | 'going' | undefined) => {
+    setWorking(true)
+    setError('')
+    try {
+      await setParticipation(event.id, status)
+      setToast(status ? `You're marked ${status} for this event.` : 'You will no longer receive new updates for this event.')
+      window.setTimeout(() => setToast(''), 2400)
+    } catch (error) { setError(error instanceof Error ? error.message : 'Could not update your participation.') }
+    finally { setWorking(false) }
+  }
+  const cancel = async () => {
+    setWorking(true)
+    setError('')
+    try { await cancelEvent(event.id); setConfirmCancel(false); setToast('Event cancelled. Attendees have been notified.') }
+    catch (error) { setError(error instanceof Error ? error.message : 'Could not cancel this event.') }
+    finally { setWorking(false) }
   }
 
   return <div className="space-y-6">
     <div className="flex items-center justify-between">
       <Button variant="ghost" size="sm" onClick={() => navigate(-1)}><ArrowLeft size={15} />Back</Button>
-      <div className="flex gap-2"><Button variant="outline" size="sm"><Share2 size={15} /><span className="hidden sm:inline">Share</span></Button>{user && event.organizerName === user.displayName && <Button asChild variant="outline" size="sm"><Link to={`/events/${event.id}/edit`}><Pencil size={15} />Edit event</Link></Button>}</div>
+      <div className="flex gap-2"><Button variant="outline" size="sm"><Share2 size={15} /><span className="hidden sm:inline">Share</span></Button>{canManage && event.status !== 'cancelled' && <Button asChild variant="outline" size="sm"><Link to={`/events/${event.id}/edit`}><Pencil size={15} />Edit event</Link></Button>}</div>
     </div>
 
     <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_350px]">
@@ -65,15 +84,19 @@ export function EventDetailPage() {
         <Card className="p-5 sm:p-6">
           <div className="flex items-center justify-between"><p className="text-sm font-semibold text-stone-800">Your plan</p><span className="text-xs text-stone-400">Change anytime</span></div>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <Button variant={event.viewerParticipation === 'interested' ? 'primary' : 'outline'} className="h-12" aria-pressed={event.viewerParticipation === 'interested'} disabled={!user} onClick={() => chooseParticipation(event.viewerParticipation === 'interested' ? undefined : 'interested')}><Heart size={16} fill={event.viewerParticipation === 'interested' ? 'currentColor' : 'none'} />Interested</Button>
-            <Button variant={event.viewerParticipation === 'going' ? 'dark' : 'outline'} className="h-12" aria-pressed={event.viewerParticipation === 'going'} disabled={!user} onClick={() => chooseParticipation(event.viewerParticipation === 'going' ? undefined : 'going')}><Check size={16} />Going</Button>
+            <Button variant={event.viewerParticipation === 'interested' ? 'primary' : 'outline'} className="h-12" aria-pressed={event.viewerParticipation === 'interested'} disabled={!user || working || event.status === 'cancelled'} onClick={() => void chooseParticipation(event.viewerParticipation === 'interested' ? undefined : 'interested')}><Heart size={16} fill={event.viewerParticipation === 'interested' ? 'currentColor' : 'none'} />Interested</Button>
+            <Button variant={event.viewerParticipation === 'going' ? 'dark' : 'outline'} className="h-12" aria-pressed={event.viewerParticipation === 'going'} disabled={!user || working || event.status === 'cancelled'} onClick={() => void chooseParticipation(event.viewerParticipation === 'going' ? undefined : 'going')}><Check size={16} />Going</Button>
           </div>
           <p className="mt-3 text-xs leading-5 text-stone-500">{user ? 'Mark yourself interested to join the event chat, or choose going if you plan to attend.' : 'Sign in to mark your interest, choose Going, or join the event chat.'}</p>
           {!user && <Button asChild variant="secondary" className="mt-4 w-full"><Link to="/login">Sign in to join this event</Link></Button>}
           {canChat ? <Button asChild className="mt-5 w-full" variant="secondary"><Link to={`/chats/${event.id}`}><MessageCircle size={16} />Open event chat</Link></Button> : <Button className="mt-5 w-full" variant="outline" disabled><MessageCircle size={16} />Open event chat</Button>}
           {!canChat && <p className="mt-2 text-center text-[11px] text-stone-400">Choose Interested or Going to unlock chat</p>}
+          {error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
           {toast && <p role="status" className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">{toast}</p>}
         </Card>
+
+        {canManage && event.status !== 'cancelled' && <Card className="p-5"><h2 className="text-sm font-bold">Manage event</h2>{confirmCancel ? <div className="mt-3 space-y-3"><p className="text-sm leading-6 text-stone-600">Cancel this event? Interested and attending users will receive a saved alert immediately.</p><div className="flex flex-wrap gap-2"><Button disabled={working} onClick={() => void cancel()}>Confirm cancellation</Button><Button variant="outline" disabled={working} onClick={() => setConfirmCancel(false)}>Keep event</Button></div></div> : <Button variant="outline" className="mt-3" onClick={() => setConfirmCancel(true)}>Cancel event</Button>}</Card>}
+        {event.status === 'cancelled' && <p role="status" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">This event has been cancelled. Existing notifications remain in your inbox.</p>}
 
         <Card className="p-5">
           <div className="flex items-center justify-between"><h2 className="text-sm font-bold text-stone-900">The group</h2><Link to="/chats" className="text-xs font-semibold text-brand-700">See chat</Link></div>

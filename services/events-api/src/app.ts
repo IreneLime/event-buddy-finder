@@ -20,3 +20,6 @@ export function createApp() {
 
   return app
 }
+
+// Compatibility with notification integration tests and existing callers.
+export { createApp as createEventsApp }

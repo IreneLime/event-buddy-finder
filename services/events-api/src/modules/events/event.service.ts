@@ -113,7 +113,7 @@ export async function updateEvent(
   }
 
   try {
-    await eventRepository.updateEvent(eventId, body)
+    await eventRepository.updateEvent(ownership.id, body, userId)
   } catch (error) {
     if (
       error &&
@@ -137,7 +137,7 @@ export async function cancelEvent(eventId: string, userId: string): Promise<Even
     throw new ApiError(400, 'Event is already cancelled')
   }
 
-  await eventRepository.cancelEvent(eventId)
+  await eventRepository.cancelEvent(ownership.id, userId)
   return getEvent(eventId, userId)
 }
 
