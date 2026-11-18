@@ -16,7 +16,9 @@ packages/storage/          Shared DigitalOcean Spaces-compatible client
 database/migrations/       PostgreSQL schema draft
 ```
 
-The frontend currently uses local mock data. The user service implements PostgreSQL-backed profile endpoints and delegates Bearer-token verification to the auth service. Event, chat, and cloud-storage integration continues in separate feature work.
+The user service implements PostgreSQL-backed profile endpoints and delegates Bearer-token verification to the auth service. Chat adds Socket.IO messaging, a refreshed interface, and event notifications. Event chat membership reads the authoritative PostgreSQL event/RSVP records owned by events-api.
+
+The frontend retains demo sign-in. Apply the shared database migrations and use the same database URL across services to run the integrated event, chat, and notification flows.
 
 ## Get started
 
@@ -38,9 +40,10 @@ Run just one app with `pnpm dev:web`, `pnpm dev:auth`, `pnpm dev:users`, `pnpm d
 - `/events/:eventId` — event details and interest/going controls
 - `/events/new` and `/events/:eventId/edit` — shared create/edit event form
 - `/chats` and `/chats/:conversationId` — conversation list and chat view
+- `/notifications` — saved event alerts and browser notification settings
 - `/profile` and `/profile/:userId` — profile view; edit profile is linked from the current user's page
 
-Attendance and chat actions currently update local component state only. They do not persist across reloads or call the backend.
+Chat messages use the chat service's memory store. Event participation and notification integration require the separately maintained events backend and database changes. See [real-time event notifications](docs/realtime-event-notifications.md).
 
 ## Contributing
 

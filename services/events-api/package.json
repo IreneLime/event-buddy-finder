@@ -7,7 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/config/env.test.ts src/modules/events/event.filters.test.ts src/smoke/guest-browse.test.ts"
+    "test": "tsx --test src/config/env.test.ts src/modules/events/event.filters.test.ts src/smoke/guest-browse.test.ts tests/*.test.ts"
   },
   "dependencies": {
     "@event-buddy/contracts": "workspace:*",
@@ -23,6 +23,7 @@
     "@types/node": "^24.19.2",
     "@types/pg": "^8.15.6",
     "tsx": "^4.20.6",
-    "typescript": "~7.0.2"
+    "typescript": "~7.0.2",
+    "socket.io-client": "^4.8.1"
   }
 }

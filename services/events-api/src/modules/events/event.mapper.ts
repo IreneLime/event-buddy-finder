@@ -2,6 +2,7 @@ import type { EventStatus, EventSummary, ParticipationStatus } from '@event-budd
 
 export interface EventRow {
   id: string | number
+  created_by_user_id?: string
   title: string
   description: string
   starts_at: Date | string
@@ -58,6 +59,7 @@ export function mapEventRow(row: EventRow): EventSummary {
     ...(row.notes ? { notes: row.notes } : {}),
     status: row.status,
     organizerName: row.organizer_name,
+    ...(row.created_by_user_id ? { organizerUserId: row.created_by_user_id } : {}),
     participantCount,
     ...(row.viewer_participation ? { viewerParticipation: row.viewer_participation } : {}),
   }

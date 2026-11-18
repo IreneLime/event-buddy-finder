@@ -3,7 +3,7 @@ import { z } from 'zod'
 const isoDateTime = z.string().datetime({ offset: true })
 
 export const eventIdParamSchema = z.object({
-  id: z.string().regex(/^\d+$/, 'Event id must be a positive integer'),
+  id: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,149}$/, 'Invalid event id'),
 })
 
 export const eventListQuerySchema = z.object({
