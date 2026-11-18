@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg'
 
 import { pool } from '../../db/pool.js'
+import { buildEventListFilters } from './event.filters.js'
 import type { CreateEventBody, EventListQueryInput, UpdateEventBody } from './event.validation.js'
 import type { EventRow } from './event.mapper.js'
 
@@ -58,70 +59,38 @@ export async function listEvents(
   viewerUserId: string | undefined,
   query: EventListQueryInput,
 ): Promise<{ rows: EventRow[]; total: number }> {
-  const values: unknown[] = [viewerUserId ?? null]
-  const filters: string[] = ['e.status = $2']
-  values.push(query.status)
+  // List query: $1 = viewer for EVENT_SELECT; filters start at $2.
+  const listFilters = buildEventListFilters(query, 2)
+  const listValues: unknown[] = [viewerUserId ?? null, ...listFilters.values]
+  const listWhereClause = `WHERE ${listFilters.filters.join(' AND ')}`
 
-  if (query.search) {
-    values.push(`%${query.search}%`)
-    filters.push(
-      `(e.title ILIKE $${values.length} OR e.description ILIKE $${values.length} OR e.location_name ILIKE $${values.length})`,
-    )
-  }
-
-  if (query.category) {
-    values.push(query.category)
-    filters.push(`EXISTS (
-      SELECT 1
-      FROM event_categories ec
-      JOIN categories c ON c.id = ec.category_id
-      WHERE ec.event_id = e.id AND c.name = $${values.length}
-    )`)
-  }
-
-  if (query.startDate) {
-    values.push(query.startDate)
-    filters.push(`e.starts_at >= $${values.length}`)
-  }
-
-  if (query.endDate) {
-    values.push(query.endDate)
-    filters.push(`e.starts_at <= $${values.length}`)
-  }
-
-  if (query.location) {
-    values.push(`%${query.location}%`)
-    filters.push(`(e.location_name ILIKE $${values.length} OR COALESCE(e.address, '') ILIKE $${values.length})`)
-  }
-
-  const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : ''
   const sortColumn = SORT_COLUMNS[query.sortBy]
   const sortOrder = query.order === 'desc' ? 'DESC' : 'ASC'
   const offset = (query.page - 1) * query.limit
 
-  values.push(query.limit)
-  const limitParam = `$${values.length}`
-  values.push(offset)
-  const offsetParam = `$${values.length}`
+  listValues.push(query.limit)
+  const limitParam = `$${listValues.length}`
+  listValues.push(offset)
+  const offsetParam = `$${listValues.length}`
 
   const listSql = `
     ${EVENT_SELECT}
-    ${whereClause}
+    ${listWhereClause}
     ORDER BY ${sortColumn} ${sortOrder}, e.id ASC
     LIMIT ${limitParam} OFFSET ${offsetParam}
   `
 
-  // Count reuses the same filter parameter indexes ($2+); $1 viewer is unused but kept for alignment.
+  // Count query has no viewer join, so filters must start at $1 (unused $1 breaks Postgres typing).
+  const countFilters = buildEventListFilters(query, 1)
   const countSql = `
     SELECT COUNT(*)::int AS total
     FROM events e
-    ${whereClause}
+    WHERE ${countFilters.filters.join(' AND ')}
   `
-  const countValues = values.slice(0, values.length - 2)
 
   const [listResult, countResult] = await Promise.all([
-    pool.query<EventRow>(listSql, values),
-    pool.query<{ total: number }>(countSql, countValues),
+    pool.query<EventRow>(listSql, listValues),
+    pool.query<{ total: number }>(countSql, countFilters.values),
   ])
 
   return {
