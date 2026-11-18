@@ -24,6 +24,7 @@ export default function App() {
       <Route path="events/:eventId" element={<EventDetailPage />} />
       <Route path="chats" element={<ChatsPage />} />
       <Route path="notifications" element={<NotificationsPage />} />
+      <Route path="chats/event/:eventId" element={<ChatPage />} />
       <Route path="chats/:conversationId" element={<ChatPage />} />
       <Route path="profile" element={<ProfilePage />} />
       <Route path="profile/edit" element={<RequireAuth><ProfilePage /></RequireAuth>} />

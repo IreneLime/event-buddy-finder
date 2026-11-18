@@ -8,7 +8,18 @@ import { EventFormPage } from '../src/pages/event-form-page'
 import { EventDetailPage } from '../src/pages/event-detail-page'
 
 const api = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), cancel: vi.fn(), participate: vi.fn() }))
-vi.mock('../src/lib/events-api', () => ({ createEventsApi: () => api }))
+vi.mock('../src/lib/backend-api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/lib/backend-api')>(),
+  eventsApiUrl: 'http://localhost:4001',
+  eventApi: {
+    ...api,
+    save: (body: unknown, _token: string, id: string) => api.update(id, body),
+    categories: async () => ['Food', 'Community'],
+    hosted: async () => [],
+    participants: async () => ({ total: 2, items: [] }),
+  },
+  imageApi: { get: async () => ({}) },
+}))
 vi.mock('../src/components/events-map', () => ({ EventMapPreview: () => <div>Map preview</div> }))
 
 let event: EventSummary
@@ -23,6 +34,7 @@ beforeEach(() => {
     organizerName: 'Mina Park', organizerUserId: 'demo-mina', participantCount: 2, status: 'scheduled', priceAmount: 0,
   }
   api.list.mockImplementation(async () => [event])
+  api.get.mockImplementation(async () => event)
   api.update.mockImplementation(async (_id, body) => ({ ...event, ...body }))
   api.cancel.mockImplementation(async () => ({ ...event, status: 'cancelled' }))
   api.participate.mockImplementation(async (_id, status) => ({ ...event, viewerParticipation: status }))
@@ -64,8 +76,8 @@ it('requires explicit confirmation before cancelling and then shows the saved ca
   fireEvent.click(await screen.findByRole('button', { name: 'Cancel event' }))
   expect(api.cancel).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
-  await waitFor(() => expect(api.cancel).toHaveBeenCalledWith('night-market'))
-  await screen.findByText('This event has been cancelled. Existing notifications remain in your inbox.')
+  await waitFor(() => expect(api.cancel).toHaveBeenCalledWith('night-market', 'dev:demo-mina'))
+  await screen.findByText('This event has been cancelled.')
   expect(screen.queryByRole('button', { name: 'Cancel event' })).toBeNull()
 })
 
@@ -73,9 +85,9 @@ it('saves notification eligibility when a user marks interest and withdraws it o
   window.localStorage.setItem('event-buddy-demo-user', 'cathy')
   mount(false)
   fireEvent.click(await screen.findByRole('button', { name: 'Interested' }))
-  await waitFor(() => expect(api.participate).toHaveBeenCalledWith('night-market', 'interested'))
-  await screen.findByText("You're marked interested for this event.")
+  await waitFor(() => expect(api.participate).toHaveBeenCalledWith('night-market', 'interested', 'dev:demo-cathy'))
+  await screen.findByText("Marked as interested.")
   fireEvent.click(screen.getByRole('button', { name: 'Interested' }))
-  await waitFor(() => expect(api.participate).toHaveBeenLastCalledWith('night-market', 'withdrawn'))
-  await screen.findByText('You will no longer receive new updates for this event.')
+  await waitFor(() => expect(api.participate).toHaveBeenLastCalledWith('night-market', 'withdrawn', 'dev:demo-cathy'))
+  await screen.findByText('Your RSVP was cleared.')
 })

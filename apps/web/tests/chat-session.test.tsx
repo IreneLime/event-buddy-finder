@@ -6,11 +6,6 @@ import { createChatServer } from '../../../services/chat-api/src/app'
 import { createDemoStore } from '../../../services/chat-api/src/seed'
 import type { ChatState } from '../src/state/chat-context'
 
-vi.mock('../src/lib/events-api', async () => {
-  const { starterEvents } = await import('../src/data/mock-events')
-  return { createEventsApi: () => ({ list: async () => starterEvents }) }
-})
-
 const server = createChatServer({ devMode: true })
 let auth: typeof import('../src/state/auth-store')
 let chat: typeof import('../src/state/chat-store')

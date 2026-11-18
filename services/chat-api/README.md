@@ -3,8 +3,7 @@
 Express and Socket.IO chat with event membership read from the authoritative
 PostgreSQL records owned by events-api. Chat messages and direct conversations
 still use the memory adapter; event RSVP permissions and notifications do not.
-The existing Firebase identity/token-provider integration is still required for
-production. Demo identity headers are explicitly development-only.
+Firebase sessions are verified through the auth API. Demo identity headers are development-only.
 
 ## Run
 
@@ -24,7 +23,7 @@ The chat service listens on `127.0.0.1:4002`; `HOST`, `PORT`, and `WEB_ORIGIN`
 configure it. The frontend uses `VITE_CHAT_API_URL`. The development command sets
 `CHAT_DEV_MODE=true`: a demo ID such as `cathy` maps to the `demo-cathy` database
 profile. Other existing database profiles work too; users/events are not limited
-to hard-coded chat fixtures. Production uses the verified Firebase UID directly.
+to hard-coded chat fixtures. For Firebase locally, run `CHAT_DEV_MODE=false pnpm dev:chat` and set `AUTH_API_URL` if the auth service is not on localhost:4003. Production uses the verified Firebase UID directly.
 
 ## Events API owns chat membership
 

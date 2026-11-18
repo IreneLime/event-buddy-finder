@@ -4,12 +4,9 @@ import type {
   ConversationSummary, CreateGroupChatRequest, MessagePage, NotificationItem, NotificationPage,
   UpdateGroupChatRequest, UpdateGroupChatResponse,
 } from '@event-buddy/contracts'
-import { apiIdentity, setApiTokenProvider } from './api-identity'
+import { apiIdentity } from './api-identity'
 
 const origin = (import.meta.env.VITE_CHAT_API_URL ?? (import.meta.env.DEV ? 'http://localhost:4002' : window.location.origin)).replace(/\/$/, '')
-
-// Irene's Firebase integration can supply () => currentUser.getIdToken().
-export const setChatTokenProvider = setApiTokenProvider
 
 async function identity(userId: string | undefined) {
   if (!userId) throw new Error('Please sign in to use chat.')

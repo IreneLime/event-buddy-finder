@@ -9,7 +9,6 @@ import { useAuth } from '../../state/auth-store'
 import { useExploreCity } from '../../state/explore-city'
 import { NotificationsMenu } from '../notifications-menu'
 import { EventNotificationToast } from '../event-notification-toast'
-import { useEventStore } from '../../state/event-store'
 
 const primaryLinks = [
   { to: '/', label: 'Home', icon: Handshake },
@@ -32,7 +31,13 @@ export function AppShell() {
   const isChatPage = pathname === '/chats' || pathname.startsWith('/chats/')
   const { user, signOut } = useAuth()
   const { city, setCity } = useExploreCity()
-  const { loading: eventsLoading, error: eventsError, refresh: refreshEvents } = useEventStore()
+  const [signOutError, setSignOutError] = useState('')
+
+  async function handleSignOut() {
+    setSignOutError('')
+    try { await signOut(); setMobileOpen(false) }
+    catch { setSignOutError('Could not sign out. Please try again.') }
+  }
 
   return <div className="min-h-screen bg-[#faf9f7] text-stone-900">
     <header className="sticky top-0 z-40 border-b border-brand-100 bg-[#fffaf6]/95 backdrop-blur-xl">
@@ -50,7 +55,7 @@ export function AppShell() {
           {user && <NotificationsMenu />}
           {user ? <NavLink to="/events/new" className={`${buttonVariants({ size: 'sm' })} hidden sm:inline-flex`}><Plus size={16} />Create event</NavLink> : <NavLink to="/login" className={`${buttonVariants({ size: 'sm' })} hidden sm:inline-flex`}>Sign in</NavLink>}
           {user && <NavLink to="/profile" aria-label={`${user.displayName} profile`} className="hidden rounded-full ring-offset-2 transition hover:ring-2 hover:ring-brand-200 sm:block"><Avatar name={user.displayName} /></NavLink>}
-          {user && <Button variant="ghost" size="sm" className="hidden md:inline-flex" onClick={signOut}>Sign out</Button>}
+          {user && <Button variant="ghost" size="sm" className="hidden md:inline-flex" onClick={() => void handleSignOut()}>Sign out</Button>}
           <Button variant="ghost" size="icon" className="md:hidden" aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'} onClick={() => setMobileOpen((open) => !open)}>
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </Button>
@@ -62,14 +67,13 @@ export function AppShell() {
           {primaryLinks.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/' || to === '/profile'} onClick={() => setMobileOpen(false)} className={({ isActive }) => cn('flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold', isActive ? 'bg-brand-50 text-brand-700' : 'text-stone-600 hover:bg-stone-50')}>
             <Icon size={17} />{label}
           </NavLink>)}
-          {user ? <><NavLink to="/profile" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-stone-700"><UserRound size={17} />My profile</NavLink><NavLink to="/events/new" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-brand-700"><Plus size={17} />Create event</NavLink><button type="button" onClick={() => { signOut(); setMobileOpen(false) }} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-stone-600">Sign out</button></> : <NavLink to="/login" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-brand-700">Sign in</NavLink>}
+          {user ? <><NavLink to="/profile" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-stone-700"><UserRound size={17} />My profile</NavLink><NavLink to="/events/new" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-brand-700"><Plus size={17} />Create event</NavLink><button type="button" onClick={() => void handleSignOut()} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-stone-600">Sign out</button></> : <NavLink to="/login" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-brand-700">Sign in</NavLink>}
         </div>
       </nav>}
     </header>
 
+    {signOutError && <p role="alert" className="mx-auto max-w-[1320px] px-4 pt-3 text-sm text-rose-700">{signOutError}</p>}
     <main className={cn(isChatPage ? 'mx-auto flex h-[calc(100dvh-72px)] min-h-0 max-w-[1400px] flex-col px-3 pb-22 pt-3 md:px-6 md:py-6 lg:px-8' : ['min-h-[calc(100vh-72px)] pb-24', isHomePage ? 'w-full pt-0' : 'mx-auto max-w-[1320px] px-4 pt-8 sm:px-6 lg:px-8 lg:pt-10'])}>
-      {eventsLoading && <p role="status" className="px-5 py-3 text-center text-sm text-stone-500">Loading events…</p>}
-      {eventsError && <div role="alert" className="m-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{eventsError}<Button variant="ghost" size="sm" onClick={() => void refreshEvents()}>Retry events</Button></div>}
       <Outlet />
     </main>
 

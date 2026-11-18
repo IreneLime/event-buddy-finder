@@ -101,11 +101,13 @@ export async function uploadEventImage(
   file: Express.Multer.File,
   storage: ObjectStorage = getObjectStorage(),
 ): Promise<ImageResponse> {
-  const ownerPrefix = `event-images/${eventId}`
+  const id = await imageRepository.resolveEventImageId(eventId)
+  if (!id) throw new ApiError(404, 'Event not found')
+  const ownerPrefix = 'event-images/' + id
   const uploaded = await upload(ownerPrefix, file, storage)
   let replaced: Awaited<ReturnType<typeof imageRepository.replaceEventImageKey>>
   try {
-    replaced = await imageRepository.replaceEventImageKey(eventId, userId, uploaded.key)
+    replaced = await imageRepository.replaceEventImageKey(id, userId, uploaded.key)
     assertEventResult(replaced)
   } catch (error) {
     await deleteWithoutFailing(storage, uploaded.key)
@@ -122,8 +124,10 @@ export async function deleteEventImage(
   userId: string,
   storage: ObjectStorage = getObjectStorage(),
 ): Promise<void> {
-  const ownerPrefix = `event-images/${eventId}`
-  const replaced = await imageRepository.replaceEventImageKey(eventId, userId, null)
+  const id = await imageRepository.resolveEventImageId(eventId)
+  if (!id) throw new ApiError(404, 'Event not found')
+  const ownerPrefix = 'event-images/' + id
+  const replaced = await imageRepository.replaceEventImageKey(id, userId, null)
   assertEventResult(replaced)
   if (replaced.previousKey) {
     await deleteOwnedObjectWithoutFailing(storage, replaced.previousKey, ownerPrefix)
@@ -134,7 +138,8 @@ export async function getEventImage(
   eventId: string,
   storage: ObjectStorage = getObjectStorage(),
 ): Promise<ImageResponse> {
-  const key = await imageRepository.getEventImageKey(eventId)
+  const id = await imageRepository.resolveEventImageId(eventId)
+  const key = id && await imageRepository.getEventImageKey(id)
   if (!key) throw new ApiError(404, 'Event image not found')
   return { imageUrl: await storage.createDownloadUrl(key) }
 }
