@@ -23,7 +23,11 @@ export function EventStoreProvider({ children }: { children: ReactNode }) {
     }),
     setParticipation: (eventId, status) => setEvents((current) => current.map((event) => {
       if (event.id !== eventId) return event
-      const participantCount = event.participantCount + (event.viewerParticipation === 'going' ? -1 : 0) + (status === 'going' ? 1 : 0)
+      const wasCounted =
+        event.viewerParticipation === 'interested' || event.viewerParticipation === 'going'
+      const isCounted = status === 'interested' || status === 'going'
+      const participantCount =
+        event.participantCount + (wasCounted ? -1 : 0) + (isCounted ? 1 : 0)
       return { ...event, viewerParticipation: status, participantCount: Math.max(0, participantCount) }
     })),
   }), [events])
