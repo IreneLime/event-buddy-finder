@@ -7,7 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/modules/events/event.filters.test.ts src/smoke/guest-browse.test.ts"
+    "test": "tsx --test src/config/env.test.ts src/modules/events/event.filters.test.ts src/smoke/guest-browse.test.ts"
   },
   "dependencies": {
     "@event-buddy/contracts": "workspace:*",

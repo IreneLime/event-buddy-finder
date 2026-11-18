@@ -30,7 +30,14 @@ function ensureFirebase(): boolean {
 }
 
 async function resolveBearer(token: string): Promise<{ userId: string; emailVerified: boolean }> {
-  if (env.allowDevAuth && token.startsWith('dev:')) {
+  if (token.startsWith('dev:')) {
+    if (!env.allowDevAuth) {
+      throw new ApiError(
+        401,
+        'Development auth is disabled. Set ALLOW_DEV_AUTH=true locally without FIREBASE_PROJECT_ID, or use a Firebase ID token.',
+      )
+    }
+
     const userId = token.slice('dev:'.length).trim()
     if (!userId) {
       throw new ApiError(401, 'Invalid development auth token')
@@ -41,7 +48,7 @@ async function resolveBearer(token: string): Promise<{ userId: string; emailVeri
   if (!ensureFirebase()) {
     throw new ApiError(
       401,
-      'Firebase authentication is not configured. Use Authorization: Bearer dev:<firebase_uid> for local development.',
+      'Firebase authentication is not configured. For local development only, set ALLOW_DEV_AUTH=true and use Authorization: Bearer dev:<firebase_uid>.',
     )
   }
 

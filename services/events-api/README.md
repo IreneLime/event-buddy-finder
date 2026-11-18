@@ -28,7 +28,10 @@ Requires PostgreSQL with [database/migrations/001_initial_schema.sql](../../data
 ### Auth
 
 - Production / shared envs: set `FIREBASE_PROJECT_ID`, and optionally `FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY`, then send `Authorization: Bearer <Firebase ID token>`.
-- Local without Firebase: send `Authorization: Bearer dev:<firebase_uid>` (enabled when `ALLOW_DEV_AUTH` is not `false`).
+- Local without Firebase (opt-in): set `ALLOW_DEV_AUTH=true` and send `Authorization: Bearer dev:<firebase_uid>`.
+  - Off by default
+  - Disabled when `NODE_ENV=production`
+  - Disabled whenever `FIREBASE_PROJECT_ID` is set
 
 ### Environment
 
@@ -37,7 +40,7 @@ Requires PostgreSQL with [database/migrations/001_initial_schema.sql](../../data
 | `PORT` | `4001` |
 | `WEB_ORIGIN` | `http://localhost:5173` |
 | `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/event_buddy_finder` |
-| `ALLOW_DEV_AUTH` | `true` |
+| `ALLOW_DEV_AUTH` | `false` (opt-in; local only, no Firebase) |
 | `FIREBASE_PROJECT_ID` | unset |
 | `FIREBASE_CLIENT_EMAIL` | unset |
 | `FIREBASE_PRIVATE_KEY` | unset |
