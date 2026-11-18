@@ -32,6 +32,10 @@ export interface UserProfile {
   preferredCategories: string[]
 }
 
+export interface ImageResponse {
+  imageUrl: string
+}
+
 export interface CurrentUserProfile extends UserProfile {
   email: string
   profileCompleted: boolean
