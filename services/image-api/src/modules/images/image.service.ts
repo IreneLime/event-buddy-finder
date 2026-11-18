@@ -16,6 +16,18 @@ async function deleteWithoutFailing(storage: ObjectStorage, key: string): Promis
   }
 }
 
+async function deleteOwnedObjectWithoutFailing(
+  storage: ObjectStorage,
+  key: string,
+  ownerPrefix: string,
+): Promise<void> {
+  if (!key.startsWith(`${ownerPrefix}/`)) {
+    console.warn(`Skipped deletion of image object outside ${ownerPrefix}`)
+    return
+  }
+  await deleteWithoutFailing(storage, key)
+}
+
 async function upload(
   prefix: string,
   file: Express.Multer.File,
@@ -37,7 +49,8 @@ export async function uploadProfileImage(
   file: Express.Multer.File,
   storage: ObjectStorage = getObjectStorage(),
 ): Promise<ImageResponse> {
-  const uploaded = await upload(`profile-images/${encodeURIComponent(userId)}`, file, storage)
+  const ownerPrefix = `profile-images/${encodeURIComponent(userId)}`
+  const uploaded = await upload(ownerPrefix, file, storage)
   let replaced: Awaited<ReturnType<typeof imageRepository.replaceProfileImageKey>>
   try {
     replaced = await imageRepository.replaceProfileImageKey(userId, uploaded.key)
@@ -46,7 +59,9 @@ export async function uploadProfileImage(
     await deleteWithoutFailing(storage, uploaded.key)
     throw error
   }
-  if (replaced.previousKey) await deleteWithoutFailing(storage, replaced.previousKey)
+  if (replaced.previousKey) {
+    await deleteOwnedObjectWithoutFailing(storage, replaced.previousKey, ownerPrefix)
+  }
   return { imageUrl: uploaded.imageUrl }
 }
 
@@ -54,9 +69,12 @@ export async function deleteProfileImage(
   userId: string,
   storage: ObjectStorage = getObjectStorage(),
 ): Promise<void> {
+  const ownerPrefix = `profile-images/${encodeURIComponent(userId)}`
   const replaced = await imageRepository.replaceProfileImageKey(userId, null)
   if (!replaced) throw new ApiError(404, 'Profile not found')
-  if (replaced.previousKey) await deleteWithoutFailing(storage, replaced.previousKey)
+  if (replaced.previousKey) {
+    await deleteOwnedObjectWithoutFailing(storage, replaced.previousKey, ownerPrefix)
+  }
 }
 
 export async function getProfileImage(
@@ -83,7 +101,8 @@ export async function uploadEventImage(
   file: Express.Multer.File,
   storage: ObjectStorage = getObjectStorage(),
 ): Promise<ImageResponse> {
-  const uploaded = await upload(`event-images/${eventId}`, file, storage)
+  const ownerPrefix = `event-images/${eventId}`
+  const uploaded = await upload(ownerPrefix, file, storage)
   let replaced: Awaited<ReturnType<typeof imageRepository.replaceEventImageKey>>
   try {
     replaced = await imageRepository.replaceEventImageKey(eventId, userId, uploaded.key)
@@ -92,7 +111,9 @@ export async function uploadEventImage(
     await deleteWithoutFailing(storage, uploaded.key)
     throw error
   }
-  if (replaced.previousKey) await deleteWithoutFailing(storage, replaced.previousKey)
+  if (replaced.previousKey) {
+    await deleteOwnedObjectWithoutFailing(storage, replaced.previousKey, ownerPrefix)
+  }
   return { imageUrl: uploaded.imageUrl }
 }
 
@@ -101,9 +122,12 @@ export async function deleteEventImage(
   userId: string,
   storage: ObjectStorage = getObjectStorage(),
 ): Promise<void> {
+  const ownerPrefix = `event-images/${eventId}`
   const replaced = await imageRepository.replaceEventImageKey(eventId, userId, null)
   assertEventResult(replaced)
-  if (replaced.previousKey) await deleteWithoutFailing(storage, replaced.previousKey)
+  if (replaced.previousKey) {
+    await deleteOwnedObjectWithoutFailing(storage, replaced.previousKey, ownerPrefix)
+  }
 }
 
 export async function getEventImage(
