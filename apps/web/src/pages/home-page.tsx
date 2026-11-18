@@ -77,7 +77,7 @@ export function HomePage() {
     <section className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
       <div className="relative overflow-hidden rounded-[28px] bg-[#38261d] px-6 py-10 text-white sm:px-10 sm:py-12 lg:px-14">
         <div className="hero-glow hero-glow-one" aria-hidden="true" />
-          <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center"><div><p className="text-sm font-bold uppercase tracking-[.14em] text-brand-300">Your next story starts nearby</p><h2 className="mt-2 max-w-xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">Come for the event. Leave with a new connection.</h2></div><Button asChild size="lg" className="shrink-0 rounded-full bg-white text-stone-900 hover:bg-brand-50"><Link to="/events">Explore {city}<ArrowRight size={17} /></Link></Button></div>
+          <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center"><div><p className="text-sm font-bold uppercase tracking-[.14em] text-brand-300">Your next story starts nearby</p><h2 className="mt-2 max-w-xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">Come for the event. Leave with a new connection.</h2></div><Button asChild size="lg" className="shrink-0 rounded-full bg-white text-stone-900! hover:bg-brand-50 hover:text-stone-900!"><Link to="/events">Explore {city}<ArrowRight size={17} /></Link></Button></div>
       </div>
     </section>
   </div>
