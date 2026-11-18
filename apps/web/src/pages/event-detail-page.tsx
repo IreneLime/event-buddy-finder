@@ -1,8 +1,12 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useCallback, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ArrowLeft, CalendarDays, Check, Clock3, Heart, MapPin, MessageCircle, Pencil, Share2, Users } from 'lucide-react'
 import { getEventArtwork, getEventEmoji } from '../data/mock-events'
-import { useEventStore } from '../state/event-store'
+import { useEventDetails, useEventStore } from '../state/event-store'
+import type { EventSummary } from '@event-buddy/contracts'
+import { ApiImage } from '../components/api-image'
+import { errorMessage, eventApi } from '../lib/backend-api'
+import { useApiResource } from '../lib/use-api-resource'
 import { useAuth } from '../state/auth-store'
 import { demoUsers } from '../data/demo-users'
 
@@ -15,32 +19,64 @@ import { Card } from '../components/ui/card'
 
 export function EventDetailPage() {
   const { eventId = '' } = useParams()
-  const navigate = useNavigate()
   const { user } = useAuth()
-  const { getEvent, setParticipation } = useEventStore()
-  const event = getEvent(eventId)
-  const [toast, setToast] = useState('')
-
+  const { event, loading, error, retry } = useEventDetails(eventId)
+  if (loading) return <p role="status" className="p-8">Loading event…</p>
+  if (error) return <div role="alert" className="p-8">{error} <Button onClick={retry}>Try again</Button></div>
   if (!event) return <div className="mx-auto max-w-xl py-20 text-center"><p className="text-lg font-bold">We couldn't find that event.</p><Button asChild variant="secondary" className="mt-5"><Link to="/events"><ArrowLeft size={15} />Back to events</Link></Button></div>
+  return <EventDetails key={event.id + ':' + (user?.id ?? '')} loadedEvent={event} />
+}
 
-  const canChat = Boolean(user) && (event.viewerParticipation === 'interested' || event.viewerParticipation === 'going')
-  const chooseParticipation = (status: 'interested' | 'going' | undefined) => {
-    setParticipation(event.id, status)
-    setToast(status ? `You're marked ${status} for this event.` : 'Your event status has been cleared.')
-    window.setTimeout(() => setToast(''), 2400)
+function EventDetails({ loadedEvent }: { loadedEvent: EventSummary }) {
+  const navigate = useNavigate()
+  const { user, live: liveAuth } = useAuth()
+  const { live, setParticipation, cancelEvent, canEdit } = useEventStore()
+  const [updatedEvent, setUpdatedEvent] = useState<EventSummary>()
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const event = updatedEvent ?? loadedEvent
+  const eventId = event.id
+  const loadMembers = useCallback((signal: AbortSignal) => eventApi.participants(eventId, signal), [eventId])
+  const members = useApiResource(live ? loadMembers : null)
+  const canChat = !live && !liveAuth && Boolean(user) && (event.viewerParticipation === 'interested' || event.viewerParticipation === 'going')
+  const canRespond = Boolean(user && event.status !== 'cancelled' && (live ? liveAuth && user.emailVerified : !liveAuth))
+
+  async function chooseParticipation(status: 'interested' | 'going' | undefined) {
+    setBusy(true)
+    setError('')
+    setMessage('')
+    try {
+      setUpdatedEvent(await setParticipation(event, status))
+      setMessage(status ? (status === 'going' ? 'You’re going.' : 'Marked as interested.') : 'Your RSVP was cleared.')
+      if (live) members.retry()
+    } catch (error) { setError(errorMessage(error)) }
+    finally { setBusy(false) }
+  }
+
+  async function cancel() {
+    setBusy(true)
+    setError('')
+    try {
+      setUpdatedEvent(await cancelEvent(event.id))
+      setConfirmCancel(false)
+      setMessage('Event cancelled.')
+    } catch (error) { setError(errorMessage(error)) }
+    finally { setBusy(false) }
   }
 
   return <div className="space-y-6">
     <div className="flex items-center justify-between">
       <Button variant="ghost" size="sm" onClick={() => navigate(-1)}><ArrowLeft size={15} />Back</Button>
-      <div className="flex gap-2"><Button variant="outline" size="sm"><Share2 size={15} /><span className="hidden sm:inline">Share</span></Button>{user && event.organizerName === user.displayName && <Button asChild variant="outline" size="sm"><Link to={`/events/${event.id}/edit`}><Pencil size={15} />Edit event</Link></Button>}</div>
+      <div className="flex gap-2"><Button variant="outline" size="sm"><Share2 size={15} /><span className="hidden sm:inline">Share</span></Button>{canEdit(event) && event.status !== 'cancelled' && <Button asChild variant="outline" size="sm"><Link to={`/events/${event.id}/edit`}><Pencil size={15} />Edit event</Link></Button>}</div>
     </div>
 
     <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_350px]">
       <div className="space-y-6">
         <div className={`event-art ${getEventArtwork(event.categoryNames)} relative flex min-h-[280px] items-center justify-center overflow-hidden rounded-[28px] sm:min-h-[360px]`}>
-          <div className="event-art-orbit" aria-hidden="true" /><span className="event-art-emoji event-art-emoji-lg" aria-hidden="true">{getEventEmoji(event.categoryNames)}</span>
-          <Badge className="absolute left-5 top-5 border border-white/60 bg-white/90 text-stone-700">{event.status === 'scheduled' ? 'Happening soon' : 'Cancelled'}</Badge>
+          <div className="event-art-orbit" aria-hidden="true" /><ApiImage kind="event" id={live ? event.id : undefined} className="absolute inset-0 size-full object-cover" fallback={<span className="event-art-emoji event-art-emoji-lg" aria-hidden="true">{getEventEmoji(event.categoryNames)}</span>} />
+          <Badge className="absolute left-5 top-5 z-[2] border border-white/60 bg-white/90 text-stone-700">{event.status === 'scheduled' ? 'Happening soon' : 'Cancelled'}</Badge>
         </div>
         <section>
           <div className="flex flex-wrap gap-2">{event.categoryNames.map((category) => <Badge key={category} className="bg-brand-50 text-brand-700">{category}</Badge>)}</div>
@@ -65,21 +101,31 @@ export function EventDetailPage() {
         <Card className="p-5 sm:p-6">
           <div className="flex items-center justify-between"><p className="text-sm font-semibold text-stone-800">Your plan</p><span className="text-xs text-stone-400">Change anytime</span></div>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <Button variant={event.viewerParticipation === 'interested' ? 'primary' : 'outline'} className="h-12" aria-pressed={event.viewerParticipation === 'interested'} disabled={!user} onClick={() => chooseParticipation(event.viewerParticipation === 'interested' ? undefined : 'interested')}><Heart size={16} fill={event.viewerParticipation === 'interested' ? 'currentColor' : 'none'} />Interested</Button>
-            <Button variant={event.viewerParticipation === 'going' ? 'dark' : 'outline'} className="h-12" aria-pressed={event.viewerParticipation === 'going'} disabled={!user} onClick={() => chooseParticipation(event.viewerParticipation === 'going' ? undefined : 'going')}><Check size={16} />Going</Button>
+            <Button variant={event.viewerParticipation === 'interested' ? 'primary' : 'outline'} className="h-12" aria-pressed={event.viewerParticipation === 'interested'} disabled={!canRespond || busy} onClick={() => void chooseParticipation(event.viewerParticipation === 'interested' ? undefined : 'interested')}><Heart size={16} fill={event.viewerParticipation === 'interested' ? 'currentColor' : 'none'} />Interested</Button>
+            <Button variant={event.viewerParticipation === 'going' ? 'dark' : 'outline'} className="h-12" aria-pressed={event.viewerParticipation === 'going'} disabled={!canRespond || busy} onClick={() => void chooseParticipation(event.viewerParticipation === 'going' ? undefined : 'going')}><Check size={16} />Going</Button>
           </div>
-          <p className="mt-3 text-xs leading-5 text-stone-500">{user ? 'Mark yourself interested to join the event chat, or choose going if you plan to attend.' : 'Sign in to mark your interest, choose Going, or join the event chat.'}</p>
-          {!user && <Button asChild variant="secondary" className="mt-4 w-full"><Link to="/login">Sign in to join this event</Link></Button>}
-          {canChat ? <Button asChild className="mt-5 w-full" variant="secondary"><Link to={`/chats/${event.id}`}><MessageCircle size={16} />Open event chat</Link></Button> : <Button className="mt-5 w-full" variant="outline" disabled><MessageCircle size={16} />Open event chat</Button>}
-          {!canChat && <p className="mt-2 text-center text-[11px] text-stone-400">Choose Interested or Going to unlock chat</p>}
-          {toast && <p role="status" className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">{toast}</p>}
+          {!user && <Button asChild variant="secondary" className="mt-4 w-full"><Link to="/login" state={{ from: '/events/' + event.id }}>Sign in to join this event</Link></Button>}
+          {liveAuth && user && !user.emailVerified && <p className="mt-3 text-sm"><Link className="underline" to="/profile/edit">Verify your email</Link> before changing your RSVP.</p>}
+          {canChat && <Button asChild className="mt-5 w-full" variant="secondary"><Link to={'/chats/' + event.id}><MessageCircle size={16} />Open event chat</Link></Button>}
+          {error && <p role="alert" className="mt-3 text-sm text-rose-700">{error} {liveAuth && <Link to="/profile" className="underline">My profile</Link>}</p>}
+          {message && <p role="status" className="mt-3 text-sm text-emerald-700">{message}</p>}
         </Card>
 
-        <Card className="p-5">
-          <div className="flex items-center justify-between"><h2 className="text-sm font-bold text-stone-900">The group</h2><Link to="/chats" className="text-xs font-semibold text-brand-700">See chat</Link></div>
-          <div className="mt-4 flex items-center -space-x-2">{demoUsers.filter((person) => person.displayName !== event.organizerName).slice(0, 3).map((person) => <Link key={person.id} to={`/profile/${person.id}`} aria-label={`View ${person.displayName}'s public profile`} title={person.displayName}><Avatar name={person.displayName} className="size-9 border-2 border-white" /></Link>)}<span className="ml-3 text-xs text-stone-500">+{Math.max(0, event.participantCount - 3)} more</span></div>
-          <p className="mt-3 flex items-center gap-2 text-xs text-stone-500"><Users size={14} />{event.participantCount} people interested or going</p>
-          <div className="mt-4 flex items-center gap-3 border-t border-stone-100 pt-4"><Avatar name={event.organizerName} /><div><p className="text-xs font-bold text-stone-800">{event.organizerName}</p><p className="mt-0.5 text-[11px] text-stone-500">Event organizer</p></div>{demoUsers.find((person) => person.displayName === event.organizerName) && <Button asChild variant="ghost" size="sm" className="ml-auto"><Link to={`/profile/${demoUsers.find((person) => person.displayName === event.organizerName)?.id}`}>View profile</Link></Button>}</div>
+        {live && canEdit(event) && event.status !== 'cancelled' && <Card className="space-y-3 p-5">
+          {confirmCancel ? <><p>Cancel this event?</p><div className="flex gap-2"><Button disabled={busy} onClick={() => void cancel()}>Confirm cancellation</Button><Button variant="outline" disabled={busy} onClick={() => setConfirmCancel(false)}>Keep event</Button></div></>
+            : <Button variant="outline" onClick={() => setConfirmCancel(true)}>Cancel event</Button>}
+        </Card>}
+        <Card className="space-y-3 p-5">
+          <div className="flex justify-between"><h2 className="text-sm font-semibold">The group</h2>{!live && !liveAuth && <Link to="/chats" className="text-xs font-semibold text-brand-700">See chat</Link>}</div>
+          {!live && !liveAuth && <div className="flex items-center gap-2">{demoUsers.filter((person) => person.displayName !== event.organizerName).slice(0, 3).map((person) =>
+            <Link key={person.id} to={'/profile/' + person.id} aria-label={'View ' + person.displayName + '’s profile'}><Avatar name={person.displayName} /></Link>)}</div>}
+          <p className="flex items-center gap-2 text-xs text-stone-500"><Users size={14} />{members.data?.total ?? event.participantCount} people interested or going</p>
+          {members.data && <div className="flex flex-wrap gap-2">{members.data.items.map((person) =>
+            <Link key={person.userId} to={'/profile/' + encodeURIComponent(person.userId)} title={person.displayName}><Avatar name={person.displayName} /></Link>)}</div>}
+          <div className="flex items-center gap-3 border-t border-stone-100 pt-3"><Avatar name={event.organizerName} />
+            <div><p className="text-xs font-bold">{event.organizerName}</p><p className="text-[11px] text-stone-500">Event organizer</p></div>
+            {!live && demoUsers.some((person) => person.displayName === event.organizerName) && <Button asChild variant="ghost" size="sm"><Link to={'/profile/' + demoUsers.find((person) => person.displayName === event.organizerName)?.id}>View profile</Link></Button>}
+          </div>
         </Card>
         <p className="flex items-center justify-center gap-1.5 text-xs text-stone-400"><Clock3 size={13} />Posted recently · Updated just now</p>
       </aside>

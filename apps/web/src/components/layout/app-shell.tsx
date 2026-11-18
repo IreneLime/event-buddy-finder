@@ -5,6 +5,7 @@ import { Avatar } from '../ui/avatar'
 import { Button } from '../ui/button'
 import { buttonVariants } from '../ui/button'
 import { cn } from '../../lib/utils'
+import { eventsApiUrl } from '../../lib/backend-api'
 import { useAuth } from '../../state/auth-store'
 import { useExploreCity } from '../../state/explore-city'
 
@@ -27,7 +28,14 @@ export function AppShell() {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const { pathname } = useLocation()
   const isHomePage = pathname === '/'
-  const { user, signOut } = useAuth()
+  const { user, live, signOut } = useAuth()
+  const [signOutError, setSignOutError] = useState('')
+
+  async function handleSignOut() {
+    setSignOutError('')
+    try { await signOut(); setMobileOpen(false); setNotificationsOpen(false) }
+    catch { setSignOutError('Could not sign out. Please try again.') }
+  }
   const { city, setCity } = useExploreCity()
 
   return <div className="min-h-screen bg-[#faf9f7] text-stone-900">
@@ -43,7 +51,7 @@ export function AppShell() {
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <label className="hidden items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-bold text-stone-700 shadow-sm sm:flex"><MapPin size={17} className="text-brand-700" /><span className="hidden lg:inline">Explore</span><select aria-label="Choose city to explore" value={city} onChange={(event) => setCity(event.target.value)} className="max-w-36 cursor-pointer bg-transparent text-sm font-bold text-stone-900 outline-none">{exploreCities.map((name) => <option key={name}>{name}</option>)}</select></label>
-          {user && <div className="relative hidden sm:block">
+          {user && !live && !eventsApiUrl && <div className="relative hidden sm:block">
             <Button variant="ghost" size="icon" className="relative" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}>
               <Bell size={18} /><span className="absolute right-2 top-2 size-2 rounded-full border-2 border-white bg-brand-500" />
             </Button>
@@ -55,7 +63,7 @@ export function AppShell() {
           </div>}
           {user ? <NavLink to="/events/new" className={`${buttonVariants({ size: 'sm' })} hidden sm:inline-flex`}><Plus size={16} />Create event</NavLink> : <NavLink to="/login" className={`${buttonVariants({ size: 'sm' })} hidden sm:inline-flex`}>Sign in</NavLink>}
           {user && <NavLink to="/profile" aria-label={`${user.displayName} profile`} className="hidden rounded-full ring-offset-2 transition hover:ring-2 hover:ring-brand-200 sm:block"><Avatar name={user.displayName} /></NavLink>}
-          {user && <Button variant="ghost" size="sm" className="hidden md:inline-flex" onClick={signOut}>Sign out</Button>}
+          {user && <Button variant="ghost" size="sm" className="hidden md:inline-flex" onClick={() => void handleSignOut()}>Sign out</Button>}
           <Button variant="ghost" size="icon" className="md:hidden" aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'} onClick={() => setMobileOpen((open) => !open)}>
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </Button>
@@ -67,11 +75,12 @@ export function AppShell() {
           {primaryLinks.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/' || to === '/profile'} onClick={() => setMobileOpen(false)} className={({ isActive }) => cn('flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold', isActive ? 'bg-brand-50 text-brand-700' : 'text-stone-600 hover:bg-stone-50')}>
             <Icon size={17} />{label}
           </NavLink>)}
-          {user ? <><NavLink to="/profile" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-stone-700"><UserRound size={17} />My profile</NavLink><NavLink to="/events/new" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-brand-700"><Plus size={17} />Create event</NavLink><button type="button" onClick={() => { signOut(); setMobileOpen(false) }} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-stone-600">Sign out</button></> : <NavLink to="/login" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-brand-700">Sign in</NavLink>}
+          {user ? <><NavLink to="/profile" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-stone-700"><UserRound size={17} />My profile</NavLink><NavLink to="/events/new" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-brand-700"><Plus size={17} />Create event</NavLink><button type="button" onClick={() => void handleSignOut()} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-stone-600">Sign out</button></> : <NavLink to="/login" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-brand-700">Sign in</NavLink>}
         </div>
       </nav>}
     </header>
 
+    {signOutError && <p role="alert" className="mx-auto max-w-[1320px] px-4 pt-3 text-sm text-rose-700">{signOutError}</p>}
     <main className={cn('min-h-[calc(100vh-72px)] pb-24', isHomePage ? 'w-full pt-0' : 'mx-auto max-w-[1320px] px-4 pt-8 sm:px-6 lg:px-8 lg:pt-10')}>
       <Outlet />
     </main>

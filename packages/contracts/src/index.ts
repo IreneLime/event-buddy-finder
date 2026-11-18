@@ -26,7 +26,6 @@ export interface EventSummary {
   imageUrl?: string
   priceAmount?: number
   capacity?: number
-  notes?: string
   status: EventStatus
   organizerName: string
   /** Count of users with participation status `interested` or `going` (excludes `withdrawn`). */

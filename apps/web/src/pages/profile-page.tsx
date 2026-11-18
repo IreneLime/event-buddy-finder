@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { ArrowLeft, CalendarDays, Camera, Edit3, Heart, MapPin, MessageCircle, Sparkles } from 'lucide-react'
 import { Avatar } from '../components/ui/avatar'
@@ -13,6 +13,8 @@ import { useAuth } from '../state/auth-store'
 import { useEventStore } from '../state/event-store'
 import { demoUsers } from '../data/demo-users'
 
+const LiveProfilePage = lazy(() => import('./live-profile-page').then(({ LiveProfilePage: Page }) => ({ default: Page })))
+
 const ageRanges = [
   { value: 'under_18', label: 'Under 18' },
   { value: '18_24', label: '18–24' },
@@ -22,13 +24,22 @@ const ageRanges = [
 ]
 
 export function ProfilePage() {
+  const { live } = useAuth()
+  const { userId } = useParams()
+  if (live || (userId && !demoUsers.some(({ id }) => id === userId))) {
+    return <Suspense fallback={<p role="status" className="p-8">Loading profile…</p>}><LiveProfilePage /></Suspense>
+  }
+  return <DemoProfilePage />
+}
+
+function DemoProfilePage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { userId } = useParams()
   const { user: signedInUser } = useAuth()
   const { events } = useEventStore()
   const isEditing = location.pathname.endsWith('/edit')
-  const profile = userId ? demoUsers.find((candidate) => candidate.id === userId) : signedInUser
+  const profile = userId ? demoUsers.find((candidate) => candidate.id === userId) : demoUsers.find((candidate) => candidate.id === signedInUser?.id)
   const isOwnProfile = Boolean(signedInUser && (!userId || userId === signedInUser.id))
   const [name, setName] = useState(profile?.displayName ?? '')
   const [affiliation, setAffiliation] = useState(profile?.affiliation ?? '')

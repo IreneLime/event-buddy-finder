@@ -8,6 +8,7 @@ import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { demoConversations, demoMessagesByConversation, type DemoMessage } from '../data/demo-chats'
 import { demoUsers } from '../data/demo-users'
+import { eventsApiUrl } from '../lib/backend-api'
 import { useAuth } from '../state/auth-store'
 import { SignInPrompt } from '../components/sign-in-prompt'
 
@@ -18,7 +19,8 @@ function getProfileUrl(name: string) {
 
 export function ChatsPage() {
   const [query, setQuery] = useState('')
-  const { user } = useAuth()
+  const { user, live } = useAuth()
+  if (live || eventsApiUrl) return <p role="status" className="p-8 text-center text-stone-600">Messaging is unavailable while the live chat service is being integrated.</p>
   if (!user) return <SignInPrompt title="Sign in to open your chats" description="Event group chats and direct messages are available to signed-in members. Sign in with a demo profile to preview seeded conversations." />
   const conversations = demoConversations.filter((conversation) => conversation.name.toLowerCase().includes(query.toLowerCase()))
 
@@ -39,13 +41,14 @@ export function ChatsPage() {
 
 export function ChatPage() {
   const { conversationId = 'night-market' } = useParams()
-  const { user } = useAuth()
+  const { user, live } = useAuth()
   const [messages, setMessages] = useState<DemoMessage[]>(() => demoMessagesByConversation[conversationId] ?? [])
   const [body, setBody] = useState('')
   const conversation = demoConversations.find((item) => item.id === conversationId) ?? demoConversations[0]
   const conversationProfileUrl = getProfileUrl(conversation.avatar)
   useEffect(() => setMessages(demoMessagesByConversation[conversationId] ?? []), [conversationId])
 
+  if (live || eventsApiUrl) return <p role="status" className="p-8 text-center text-stone-600">Messaging is unavailable while the live chat service is being integrated.</p>
   if (!user) return <SignInPrompt title="Sign in to see this conversation" description="Messages are private to signed-in users. Sign in with a demo account to explore event chats and member profiles." />
 
   function sendMessage(event: FormEvent<HTMLFormElement>) {
