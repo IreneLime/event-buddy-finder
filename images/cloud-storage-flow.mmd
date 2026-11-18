@@ -1,0 +1,29 @@
+%%{init: {"sequence": {"actorMargin": 60, "messageMargin": 30}}}%%
+sequenceDiagram
+    autonumber
+    actor User as Browser (React App)
+    participant API as Image API (Express)
+    participant DB as PostgreSQL<br/>(local)
+    participant Spaces as DigitalOcean Spaces<br/>(cloud, S3-compatible, private bucket)
+
+    rect rgb(235, 245, 255)
+    note over User,Spaces: Upload (profile picture or event image)
+    User->>API: POST /me/profile/image<br/>multipart file + Firebase ID token
+    API->>API: verify ID token + email_verified
+    API->>API: validate file (type, size ≤ 5MB)
+    API->>Spaces: PutObject<br/>key = profile-images/{uid}/{uuid}.ext
+    Spaces-->>API: 200 OK
+    API->>DB: UPDATE app_users<br/>SET profile_image_key = new key<br/>(returns previous key)
+    DB-->>API: previous_key
+    API->>Spaces: DeleteObject(previous_key)<br/>best-effort, same owner prefix only
+    end
+
+    rect rgb(235, 255, 238)
+    note over User,Spaces: View (profile card, event card, chat, ...)
+    API->>Spaces: GetObject presigned URL request<br/>(expires in 900s)
+    Spaces-->>API: signed, time-limited URL
+    API-->>User: { imageUrl: <signed URL> }
+    User->>Spaces: GET signed URL (direct download)
+    Spaces-->>User: image bytes
+    note right of Spaces: Bytes never pass through<br/>the API server
+    end
