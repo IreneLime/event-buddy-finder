@@ -35,6 +35,5 @@ export function mapUserEvent(row: UserEventRow): EventSummary {
     status: row.status,
     organizerName: row.organizer_name,
     participantCount: Number(row.participant_count),
-    viewerParticipation: 'going',
   }
 }
