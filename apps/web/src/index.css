@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-50: #fff8f2;
+  --color-brand-100: #ffefdf;
+  --color-brand-200: #ffdbbf;
+  --color-brand-300: #ffc18f;
+  --color-brand-400: #f8b078;
+  --color-brand-500: #f49a54;
+  --color-brand-600: #ef853b;
+  --color-brand-700: #b9521d;
+  --color-brand-800: #914117;
+  --color-brand-900: #67300f;
+}
+
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #292524;
@@ -20,6 +33,7 @@ button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 
 .event-art { isolation: isolate; }
+.home-gathering-image { filter: brightness(1.13) saturate(1.1) sepia(.06); }
 .event-art::before,
 .event-art::after { position: absolute; z-index: -1; content: ""; border-radius: 9999px; }
 .event-art::before { width: 250px; height: 250px; right: -42px; top: -115px; background: rgba(255,255,255,.44); }
@@ -35,14 +49,21 @@ a { color: inherit; text-decoration: none; }
 .event-art-orbit { position: absolute; width: 320px; height: 320px; border: 1px solid rgba(255,255,255,.42); border-radius: 50%; transform: rotate(-24deg) scaleY(.55); }
 .event-art-orbit::before { position: absolute; inset: 28px; content: ""; border: 1px solid rgba(255,255,255,.35); border-radius: 50%; }
 .hero-glow { position: absolute; pointer-events: none; border-radius: 9999px; filter: blur(1px); }
-.hero-glow-one { width: 440px; height: 440px; right: -110px; top: -270px; background: radial-gradient(circle, rgba(246,147,122,.4), transparent 68%); }
-.hero-glow-two { width: 320px; height: 320px; right: 20%; bottom: -290px; background: radial-gradient(circle, rgba(180,194,127,.28), transparent 68%); }
+.hero-glow-one { width: 440px; height: 440px; right: -110px; top: -270px; background: radial-gradient(circle, rgba(247,166,107,.34), transparent 68%); }
+.hero-glow-two { width: 320px; height: 320px; right: 20%; bottom: -290px; background: radial-gradient(circle, rgba(247,166,107,.2), transparent 68%); }
 .map-placeholder { background-color: #eff0e9; background-image: linear-gradient(35deg, transparent 47%, rgba(255,255,255,.85) 48%, rgba(255,255,255,.85) 51%, transparent 52%), linear-gradient(125deg, transparent 45%, rgba(255,255,255,.78) 46%, rgba(255,255,255,.78) 49%, transparent 50%); }
 .map-grid-lines { position: absolute; inset: 0; opacity: .5; background-image: linear-gradient(90deg, transparent 49%, rgba(120,130,110,.12) 50%, transparent 51%), linear-gradient(transparent 49%, rgba(120,130,110,.12) 50%, transparent 51%); background-size: 54px 54px; }
-.profile-cover { overflow: hidden; background: linear-gradient(120deg, #f3b7a9 0%, #f5d8b3 46%, #d8d9c0 100%); }
+.event-map-marker-wrap { border: 0; background: transparent; }
+.event-map-marker { position: relative; display: grid; width: 42px; height: 42px; place-items: center; border: 3px solid #fff; border-radius: 15px 15px 15px 5px; background: #ef8e49; box-shadow: 0 5px 0 #b9521d, 0 8px 14px rgba(105,48,15,.26); font-size: 22px; transform: rotate(-45deg); transition: transform .15s ease, box-shadow .15s ease; }
+.event-map-marker > span { transform: rotate(45deg); }
+.event-map-marker-wrap:hover .event-map-marker { transform: rotate(-45deg) translateY(-3px) scale(1.08); box-shadow: 0 7px 0 #b9521d, 0 12px 18px rgba(105,48,15,.26); }
+.event-map-tiles { filter: saturate(1.2) brightness(1.04) contrast(.96); }
+.leaflet-popup-content-wrapper { border: 2px solid #ffdbbf; border-radius: 16px !important; box-shadow: 0 10px 28px rgba(105,48,15,.16) !important; }
+.leaflet-popup-tip { background: #fff !important; }
+.profile-cover { overflow: hidden; background: linear-gradient(120deg, #ef8e49 0%, #f8c394 46%, #fff0df 100%); }
 .profile-cover::before, .profile-cover::after { position: absolute; content: ""; border: 1px solid rgba(255,255,255,.55); border-radius: 9999px; }
 .profile-cover::before { width: 220px; height: 220px; right: -44px; top: -120px; }
 .profile-cover::after { width: 150px; height: 150px; right: 25px; top: -85px; }
 .profile-sparkle { position: absolute; right: 26px; bottom: 18px; color: rgba(255,255,255,.86); }
 
-::selection { background: #ffe4e6; color: #881337; }
+::selection { background: #ffdbbf; color: #67300f; }
