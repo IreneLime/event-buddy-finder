@@ -8,10 +8,12 @@ export interface EventRow {
   ends_at: Date | string | null
   location_name: string
   address: string | null
+  city: string | null
   latitude: string | number | null
   longitude: string | number | null
   price_amount: string | number | null
   capacity: number | null
+  notes: string | null
   image_object_key: string | null
   status: EventStatus
   organizer_name: string
@@ -46,12 +48,14 @@ export function mapEventRow(row: EventRow): EventSummary {
     ...(endsAt ? { endsAt } : {}),
     locationName: row.location_name,
     ...(row.address ? { address: row.address } : {}),
+    ...(row.city ? { city: row.city } : {}),
     ...(latitude !== undefined && !Number.isNaN(latitude) ? { latitude } : {}),
     ...(longitude !== undefined && !Number.isNaN(longitude) ? { longitude } : {}),
     categoryNames: row.category_names ?? [],
     ...(row.image_object_key ? { imageUrl: row.image_object_key } : {}),
     ...(priceAmount !== undefined && !Number.isNaN(priceAmount) ? { priceAmount } : {}),
     ...(row.capacity !== null && row.capacity !== undefined ? { capacity: row.capacity } : {}),
+    ...(row.notes ? { notes: row.notes } : {}),
     status: row.status,
     organizerName: row.organizer_name,
     participantCount,

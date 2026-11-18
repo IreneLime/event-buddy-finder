@@ -24,7 +24,7 @@ export function buildEventListFilters(
   if (query.search) {
     const placeholder = alloc(`%${query.search}%`)
     filters.push(
-      `(e.title ILIKE ${placeholder} OR e.description ILIKE ${placeholder} OR e.location_name ILIKE ${placeholder})`,
+      `(e.title ILIKE ${placeholder} OR e.description ILIKE ${placeholder} OR e.location_name ILIKE ${placeholder} OR COALESCE(e.city, '') ILIKE ${placeholder} OR COALESCE(e.notes, '') ILIKE ${placeholder})`,
     )
   }
 
@@ -49,8 +49,12 @@ export function buildEventListFilters(
   if (query.location) {
     const placeholder = alloc(`%${query.location}%`)
     filters.push(
-      `(e.location_name ILIKE ${placeholder} OR COALESCE(e.address, '') ILIKE ${placeholder})`,
+      `(e.location_name ILIKE ${placeholder} OR COALESCE(e.address, '') ILIKE ${placeholder} OR COALESCE(e.city, '') ILIKE ${placeholder})`,
     )
+  }
+
+  if (query.city) {
+    filters.push(`e.city ILIKE ${alloc(query.city)}`)
   }
 
   return { filters, values }

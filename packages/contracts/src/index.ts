@@ -17,12 +17,14 @@ export interface EventSummary {
   endsAt?: string
   locationName: string
   address?: string
+  city?: string
   latitude?: number
   longitude?: number
   categoryNames: string[]
   imageUrl?: string
   priceAmount?: number
   capacity?: number
+  notes?: string
   status: EventStatus
   organizerName: string
   participantCount: number
@@ -36,10 +38,12 @@ export interface CreateEventRequest {
   endsAt?: string
   locationName: string
   address?: string
+  city?: string
   latitude?: number
   longitude?: number
   priceAmount?: number
   capacity?: number
+  notes?: string
   categoryNames: string[]
   organizingGroupId?: string
   imageObjectKey?: string
@@ -52,10 +56,12 @@ export interface UpdateEventRequest {
   endsAt?: string | null
   locationName?: string
   address?: string | null
+  city?: string | null
   latitude?: number | null
   longitude?: number | null
   priceAmount?: number | null
   capacity?: number | null
+  notes?: string | null
   categoryNames?: string[]
   organizingGroupId?: string | null
   imageObjectKey?: string | null
@@ -69,6 +75,7 @@ export interface EventListQuery {
   startDate?: string
   endDate?: string
   location?: string
+  city?: string
   status?: EventStatus
   sortBy?: EventSortBy
   order?: SortOrder

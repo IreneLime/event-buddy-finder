@@ -14,10 +14,12 @@ const EVENT_SELECT = `
     e.ends_at,
     e.location_name,
     e.address,
+    e.city,
     e.latitude,
     e.longitude,
     e.price_amount,
     e.capacity,
+    e.notes,
     e.image_object_key,
     e.status,
     u.display_name AS organizer_name,
@@ -197,13 +199,15 @@ export async function createEvent(creatorId: string, body: CreateEventBody): Pro
           ends_at,
           location_name,
           address,
+          city,
           latitude,
           longitude,
           price_amount,
           capacity,
+          notes,
           image_object_key
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING id::text
       `,
       [
@@ -215,10 +219,12 @@ export async function createEvent(creatorId: string, body: CreateEventBody): Pro
         body.endsAt ?? null,
         body.locationName,
         body.address ?? null,
+        body.city ?? null,
         body.latitude ?? null,
         body.longitude ?? null,
         body.priceAmount ?? null,
         body.capacity ?? null,
+        body.notes ?? null,
         body.imageObjectKey ?? null,
       ],
     )
@@ -255,10 +261,12 @@ export async function updateEvent(eventId: string, body: UpdateEventBody): Promi
     if (body.endsAt !== undefined) push('ends_at', body.endsAt)
     if (body.locationName !== undefined) push('location_name', body.locationName)
     if (body.address !== undefined) push('address', body.address)
+    if (body.city !== undefined) push('city', body.city)
     if (body.latitude !== undefined) push('latitude', body.latitude)
     if (body.longitude !== undefined) push('longitude', body.longitude)
     if (body.priceAmount !== undefined) push('price_amount', body.priceAmount)
     if (body.capacity !== undefined) push('capacity', body.capacity)
+    if (body.notes !== undefined) push('notes', body.notes)
     if (body.organizingGroupId !== undefined) push('organizing_group_id', body.organizingGroupId)
     if (body.imageObjectKey !== undefined) push('image_object_key', body.imageObjectKey)
 
