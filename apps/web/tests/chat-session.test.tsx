@@ -53,7 +53,7 @@ function connectedUsers() {
 function AccountControls() {
   const { signIn, signOut } = auth.useAuth()
   return <>
-    {['cathy', 'mina', 'alex', 'nadia'].map((id) => <button key={id} onClick={() => signIn(`${id}@example.test`, 'demo1234')}>Log in as {id}</button>)}
+    {['cathy', 'mina', 'alex', 'nadia'].map((id) => <button key={id} onClick={() => signIn(`${id}@example.test`, '123')}>Log in as {id}</button>)}
     <button onClick={signOut}>Log out</button>
   </>
 }

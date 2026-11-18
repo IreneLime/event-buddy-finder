@@ -12,7 +12,7 @@ Implements the in-app event alerts and optional browser alerts in proposal §2.6
 4. Open the bell → **View all notifications & settings**, or `/notifications`, to see saved updates, filter unread alerts, mark one/all read, and load older alerts.
 5. Optionally click **Enable browser alerts**. Permission is requested only on this click. Browser alerts work while the app is open, including in another tab; preferences are stored separately for each signed-in account.
 
-Demo: sign in as Mina in one browser profile and Cathy in another. Edit `/events/night-market` as Mina; Cathy receives an alert. Disconnect Cathy, edit again, and reconnect to see the saved update. The demo password is `demo1234`.
+Demo: sign in as Mina in one browser profile and Cathy in another. Edit `/events/night-market` as Mina; Cathy receives an alert. Disconnect Cathy, edit again, and reconnect to see the saved update. The demo password is `123`.
 
 ## Persistence and delivery
 

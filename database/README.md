@@ -21,6 +21,16 @@ pnpm --filter @event-buddy/database db:seed
 
 The typed seed uses placeholder Firebase UIDs such as `demo-cathy`; it does not create Firebase Authentication accounts. It is development-only data, not real user information. Frontend demo accounts are defined in `apps/web/src/data/demo-users.ts`; development IDs map to the seeded database UIDs for event, chat, and notification requests.
 
+For the full 20-event and 20-profile demo dataset, apply these optional seeds
+in order after the schema migrations:
+
+```sh
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/seeds/001_demo_data.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/seeds/002_explore_demo.sql
+```
+
+The four primary demo profiles include past Going and upcoming Interested RSVPs.
+
 The schema is maintained as PostgreSQL SQL migrations, with Prisma ORM 7 providing generated TypeScript models and typed database access for the TypeScript backend. The `@event-buddy/database` workspace package exports a shared Prisma client and model types for the Express services; generated client code is not committed. SQL migrations remain the source of truth for database constraints that Prisma's schema does not express, such as status checks.
 
 ## Design notes
