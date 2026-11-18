@@ -1,9 +1,9 @@
 # Chat and Notifications API
 
 Express and Socket.IO chat with event membership read from the authoritative
-PostgreSQL records owned by events-api. Chat messages and direct conversations
-still use the memory adapter; event RSVP permissions and notifications do not.
-Firebase sessions are verified through the auth API. Demo identity headers are development-only.
+PostgreSQL records owned by events-api. Chat messages, direct conversations,
+and notifications persist in PostgreSQL across service restarts. Firebase sessions
+are verified through the auth API. Demo identity headers are development-only.
 
 ## Run
 
@@ -46,7 +46,7 @@ to hard-coded chat fixtures. For Firebase locally, run `CHAT_DEV_MODE=false pnpm
   refreshes chat state and invalidates the open chat view. A lookup never silently
   re-enrolls a withdrawn user.
 - Restarting chat preserves event membership and stable conversation IDs, while
-  in-memory message history/direct conversations still reset.
+  messages and direct conversations persist in PostgreSQL.
 
 ## API
 
