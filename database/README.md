@@ -32,6 +32,7 @@ The schema is maintained as PostgreSQL SQL migrations, with Prisma ORM 7 providi
 - Joining an event chat creates or updates the user's participation to `interested`. Users marked interested or going can access the chat. The backend should apply the participation change and conversation membership in a transaction. Direct conversations should contain exactly two users; the backend enforces this rule.
 - Event updates and cancellations should save a notification for each affected interested or going attendee before Socket.IO broadcasts to currently connected users. The inbox indexes support loading recent and unread notifications.
 - `profile_image_key` and `events.image_object_key` store DigitalOcean Spaces object keys. Image bytes stay in Spaces; the TypeScript backend will handle upload and download access and associate each key with its profile or event record.
+- Development image integration can be seeded after the schema with `psql "$DATABASE_URL" -f database/seeds/001_demo_images.sql`. The seed creates a demo profile and event that reference private fixtures already uploaded to the development bucket; do not apply it in production.
 - Event/category many-to-many relationships support multiple categories per event. Date and location indexes support the event browse and filter queries.
 
 ## Initial assumptions to review
