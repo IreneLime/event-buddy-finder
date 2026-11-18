@@ -46,3 +46,5 @@ Requires PostgreSQL with [database/migrations/001_initial_schema.sql](../../data
 | `FIREBASE_PRIVATE_KEY` | unset |
 
 Shared request/response types live in `@event-buddy/contracts`.
+
+Event notification integration also requires migrations 002–003. See [real-time event notifications](../../docs/realtime-event-notifications.md).

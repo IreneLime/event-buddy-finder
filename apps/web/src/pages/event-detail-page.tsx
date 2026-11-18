@@ -40,15 +40,15 @@ function EventDetails({ loadedEvent }: { loadedEvent: EventSummary }) {
   const eventId = event.id
   const loadMembers = useCallback((signal: AbortSignal) => eventApi.participants(eventId, signal), [eventId])
   const members = useApiResource(live ? loadMembers : null)
-  const canChat = !live && !liveAuth && Boolean(user) && (event.viewerParticipation === 'interested' || event.viewerParticipation === 'going')
-  const canRespond = Boolean(user && event.status !== 'cancelled' && (live ? liveAuth && user.emailVerified : !liveAuth))
+  const canChat = event.status !== 'cancelled' && Boolean(user) && ((canEdit(event) && event.viewerParticipation !== 'withdrawn') || event.viewerParticipation === 'interested' || event.viewerParticipation === 'going')
+  const canRespond = Boolean(user && event.status !== 'cancelled' && (live ? liveAuth ? user.emailVerified : import.meta.env.DEV : !liveAuth))
 
   async function chooseParticipation(status: 'interested' | 'going' | undefined) {
     setBusy(true)
     setError('')
     setMessage('')
     try {
-      setUpdatedEvent(await setParticipation(event, status))
+      setUpdatedEvent(await setParticipation(event.id, status))
       setMessage(status ? (status === 'going' ? 'You’re going.' : 'Marked as interested.') : 'Your RSVP was cleared.')
       if (live) members.retry()
     } catch (error) { setError(errorMessage(error)) }
@@ -106,8 +106,10 @@ function EventDetails({ loadedEvent }: { loadedEvent: EventSummary }) {
           </div>
           {!user && <Button asChild variant="secondary" className="mt-4 w-full"><Link to="/login" state={{ from: '/events/' + event.id }}>Sign in to join this event</Link></Button>}
           {liveAuth && user && !user.emailVerified && <p className="mt-3 text-sm"><Link className="underline" to="/profile/edit">Verify your email</Link> before changing your RSVP.</p>}
-          {canChat && <Button asChild className="mt-5 w-full" variant="secondary"><Link to={'/chats/' + event.id}><MessageCircle size={16} />Open event chat</Link></Button>}
+          {user && !canChat && event.status === 'scheduled' && <p className="mt-3 text-xs text-stone-600">Choose Interested or Going to open the event chat.</p>}
+          {canChat && <Button asChild className="mt-5 w-full" variant="secondary"><Link to={'/chats/event/' + encodeURIComponent(event.id)}><MessageCircle size={16} />Open event chat</Link></Button>}
           {error && <p role="alert" className="mt-3 text-sm text-rose-700">{error} {liveAuth && <Link to="/profile" className="underline">My profile</Link>}</p>}
+          {event.status === 'cancelled' && <p role="status" className="mt-3 text-sm">This event has been cancelled.</p>}
           {message && <p role="status" className="mt-3 text-sm text-emerald-700">{message}</p>}
         </Card>
 
@@ -124,6 +126,7 @@ function EventDetails({ loadedEvent }: { loadedEvent: EventSummary }) {
             <Link key={person.userId} to={'/profile/' + encodeURIComponent(person.userId)} title={person.displayName}><Avatar name={person.displayName} /></Link>)}</div>}
           <div className="flex items-center gap-3 border-t border-stone-100 pt-3"><Avatar name={event.organizerName} />
             <div><p className="text-xs font-bold">{event.organizerName}</p><p className="text-[11px] text-stone-500">Event organizer</p></div>
+            {live && event.organizerUserId && <Button asChild variant="ghost" size="sm"><Link to={'/profile/' + encodeURIComponent(event.organizerUserId)}>View profile</Link></Button>}
             {!live && demoUsers.some((person) => person.displayName === event.organizerName) && <Button asChild variant="ghost" size="sm"><Link to={'/profile/' + demoUsers.find((person) => person.displayName === event.organizerName)?.id}>View profile</Link></Button>}
           </div>
         </Card>

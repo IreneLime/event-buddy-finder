@@ -1,6 +1,6 @@
 export type EventStatus = 'scheduled' | 'cancelled'
 
-export type ParticipationStatus = 'interested' | 'going' | 'withdrawn'
+export type ParticipationStatus = 'interested' | 'pending_approval' | 'going' | 'declined' | 'withdrawn'
 
 export type AgeRange = 'under_18' | '18_24' | '25_34' | '35_44' | '45_plus'
 export type EventSortBy = 'startsAt' | 'createdAt' | 'title'
@@ -28,6 +28,7 @@ export interface EventSummary {
   capacity?: number
   status: EventStatus
   organizerName: string
+  organizerUserId?: string
   /** Count of users with participation status `interested` or `going` (excludes `withdrawn`). */
   participantCount: number
   viewerParticipation?: ParticipationStatus
@@ -173,7 +174,70 @@ export interface NotificationItem {
   id: string
   kind: 'event_updated' | 'event_cancelled'
   eventId: string
+  eventTitle?: string
   message: string
   createdAt: string
   readAt?: string
+}
+
+export interface NotificationPage {
+  items: NotificationItem[]
+  unreadCount: number
+  nextCursor?: string
+}
+
+export interface ChatMember {
+  userId: string
+  displayName: string
+}
+
+export interface ConversationMessage extends ChatMessage {
+  senderDisplayName: string
+}
+
+export interface ConversationSummary {
+  id: string
+  kind: 'event' | 'direct'
+  title: string
+  eventId?: string
+  memberCount: number
+  lastMessage?: ConversationMessage
+  createdAt: string
+}
+
+export interface MessagePage {
+  items: ConversationMessage[]
+  nextCursor?: string
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  members: ChatMember[]
+  messages: MessagePage
+}
+
+export interface CreateGroupChatRequest { eventId: string; title: string }
+export interface UpdateGroupChatEventRequest {
+  title: string
+  kind: NotificationItem['kind']
+}
+export type UpdateGroupChatRequest = { status: ParticipationStatus } | UpdateGroupChatEventRequest
+export interface UpdateGroupChatResponse {
+  conversationId: string
+  status?: ParticipationStatus
+  conversation?: ConversationDetail
+}
+export interface SendMessageRequest { conversationId: string; body: string }
+export interface ApiError { code: string; message: string }
+export type ChatResult<T> = { ok: true; data: T } | { ok: false; error: ApiError }
+
+// Shared by Socket.IO server and client. Authentication travels in handshake.auth.
+export interface ChatServerEvents {
+  'message:created': (message: ConversationMessage) => void
+  'conversations:changed': () => void
+  'notification:created': (notification: NotificationItem) => void
+  'notifications:changed': () => void
+}
+
+export interface ChatClientEvents {
+  'message:send': (request: SendMessageRequest, ack: (result: ChatResult<ConversationMessage>) => void) => void
 }

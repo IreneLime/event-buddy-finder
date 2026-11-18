@@ -14,6 +14,7 @@ import { Field } from '../components/ui/field'
 import { Input } from '../components/ui/input'
 import { ApiError, errorMessage, eventApi, eventsApiUrl, imageApi, profileApi } from '../lib/backend-api'
 import { useApiResource } from '../lib/use-api-resource'
+import { useChatStore } from '../state/chat-context'
 import { useAuth } from '../state/auth-store'
 
 const ageRanges: Record<AgeRange, string> = { under_18: 'Under 18', '18_24': '18–24', '25_34': '25–34', '35_44': '35–44', '45_plus': '45+' }
@@ -30,6 +31,7 @@ export function LiveProfilePage() {
 function ProfileView({ id, isPrivate }: { id: string; isPrivate: boolean }) {
   const { getToken, user } = useAuth()
   const location = useLocation()
+  const chat = useChatStore()
   const [saved, setSaved] = useState<CurrentUserProfile>()
   const [retryPhoto, setRetryPhoto] = useState(false)
   const load = useCallback(async (signal: AbortSignal) => {
@@ -49,7 +51,14 @@ function ProfileView({ id, isPrivate }: { id: string; isPrivate: boolean }) {
   if (resource.loading && !saved) return <p role="status" className="p-8">Loading profile…</p>
   if (resource.error && !saved) return <Card className="p-8"><p role="alert">{resource.error}</p><Button className="mt-3" onClick={resource.retry}>Try again</Button></Card>
   if (isEditing && user && !user.emailVerified) return <VerifyEmail />
-  if (isEditing) return <ProfileEditor profile={profile as CurrentUserProfile | null} onSaved={(updated, photoFailed) => { setSaved(updated); setRetryPhoto(photoFailed) }} onCancel={() => setRetryPhoto(false)} />
+  if (isEditing) return <ProfileEditor profile={profile as CurrentUserProfile | null} onSaved={(updated, photoFailed) => {
+    setSaved(updated)
+    setRetryPhoto(photoFailed)
+    if (!profile) {
+      if (!chat.socket.connected) chat.socket.connect()
+      void chat.refresh()
+    }
+  }} onCancel={() => setRetryPhoto(false)} />
   if (!profile) return null
   return <ProfileDetails profile={profile} isPrivate={isPrivate} />
 }
@@ -184,6 +193,7 @@ function ProfileDetails({ profile, isPrivate }: { profile: UserProfile; isPrivat
     <header className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-3xl font-bold">{own ? 'My profile' : profile.displayName}</h1>
       {own && <Button asChild variant="outline"><Link to="/profile/edit"><Edit3 size={15} />Edit profile</Link></Button>}
+      {user && user.id !== profile.id && !own && <Button asChild variant="outline"><Link to={'/chats/dm-' + encodeURIComponent(profile.id)}>Message</Link></Button>}
       {user?.id === profile.id && !own && <Button asChild variant="outline"><Link to="/profile">My profile</Link></Button>}
     </header>
     <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">

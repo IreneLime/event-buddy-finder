@@ -21,7 +21,7 @@ export function EventFormPage() {
   if (error || categoriesError) return <div role="alert" className="p-8">{error || categoriesError} <Button onClick={error ? retry : retryCategories}>Try again</Button></div>
   if (eventId && !event) return <div className="py-20 text-center"><h1 className="text-2xl font-bold">Event not found</h1><Button asChild variant="secondary" className="mt-5"><Link to="/events">Back to events</Link></Button></div>
   if (liveAuth && !user?.emailVerified) return <div className="p-8"><Link to="/profile/edit">Verify your email in your profile to continue.</Link></div>
-  if (live && !liveAuth) return <p className="p-8">Firebase sign-in is required to create or edit server events.</p>
+  if (live && !liveAuth && !import.meta.env.DEV) return <p className="p-8">Firebase sign-in is required to create or edit server events.</p>
   if (liveAuth && !live) return <p className="p-8">Event editing is unavailable until the events API is connected.</p>
 
   return <EventEditor key={eventId ?? 'new'} event={event} />
@@ -61,7 +61,8 @@ function EventEditor({ event }: { event?: EventSummary }) {
         title,
         description,
         notes,
-        startsAt: new Date(startsAt).toISOString(),
+        startsAt: localDateTime(event?.startsAt) === startsAt && event ? event.startsAt : new Date(startsAt).toISOString(),
+        endsAt: event?.endsAt,
         locationName: location,
         city,
         address,

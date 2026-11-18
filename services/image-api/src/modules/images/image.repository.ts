@@ -37,6 +37,14 @@ export async function replaceProfileImageKey(
   }
 }
 
+export async function resolveEventImageId(eventId: string): Promise<string | undefined> {
+  const result = await pool.query<{ id: string }>(
+    "SELECT id::text FROM events e WHERE id::text = $1 OR to_jsonb(e)->>'public_id' = $1",
+    [eventId],
+  )
+  return result.rows[0]?.id
+}
+
 export async function getEventImageKey(eventId: string): Promise<string | null | undefined> {
   const result = await pool.query<{ image_object_key: string | null }>(
     `SELECT image_object_key FROM events WHERE id = $1`,
