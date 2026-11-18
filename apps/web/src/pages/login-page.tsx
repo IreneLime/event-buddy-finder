@@ -62,7 +62,7 @@ export function LoginPage() {
 
   function fillDemoAccount(userEmail: string) {
     setEmail(userEmail)
-    setPassword('demo1234')
+    setPassword('123')
     setError('')
   }
 
