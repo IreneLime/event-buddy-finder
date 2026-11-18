@@ -27,6 +27,7 @@ export interface EventSummary {
   notes?: string
   status: EventStatus
   organizerName: string
+  /** Count of users with participation status `interested` or `going` (excludes `withdrawn`). */
   participantCount: number
   viewerParticipation?: ParticipationStatus
 }

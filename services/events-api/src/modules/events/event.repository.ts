@@ -26,7 +26,7 @@ const EVENT_SELECT = `
     COALESCE((
       SELECT COUNT(*)::int
       FROM event_participations ep
-      WHERE ep.event_id = e.id AND ep.status = 'going'
+      WHERE ep.event_id = e.id AND ep.status IN ('interested', 'going')
     ), 0) AS participant_count,
     COALESCE((
       SELECT array_agg(c.name ORDER BY c.name)
