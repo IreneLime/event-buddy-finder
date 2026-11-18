@@ -8,6 +8,12 @@ This service does not verify Firebase tokens itself. Protected requests forward 
 
 The Firebase authentication PR must therefore be deployed before protected user routes can work.
 
+## Signup and profile lifecycle
+
+Firebase creates the authenticated identity when registration succeeds, before the user verifies their email. The user API does not create an `app_users` row at that point. After verification, the frontend refreshes the Firebase token and requests `GET /me/profile`; a `404` means profile setup is still required. The PostgreSQL profile is created only when the verified user submits `POST /me/profile`, and it is always keyed by the trusted Firebase UID from the authentication service.
+
+Guests and unverified signed-in users may browse public profiles and event history. `GET /me/profile` requires sign-in but not email verification, while creating or updating a profile requires both sign-in and verified email. Other services should use the same rule for protected state-changing actions so the frontend can consistently unlock them from the Firebase `emailVerified` state.
+
 ## Endpoints
 
 | Method | Path | Authentication | Description |
