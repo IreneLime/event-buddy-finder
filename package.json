@@ -15,7 +15,9 @@
     "dev:chat": "pnpm --filter @event-buddy/chat-api dev",
     "dev:images": "pnpm --filter @event-buddy/image-api dev",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test:realtime": "pnpm --filter @event-buddy/chat-api test && pnpm --filter @event-buddy/web test",
+    "test:realtime:db": "pnpm --filter @event-buddy/chat-api test:membership && pnpm --filter @event-buddy/chat-api test:persistence && pnpm --filter @event-buddy/events-api test:notifications"
   },
   "devDependencies": {
     "concurrently": "^10.0.7"

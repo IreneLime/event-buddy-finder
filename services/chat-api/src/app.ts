@@ -10,6 +10,7 @@ import { createDemoStore } from './seed.js'
 import type { NotificationStore } from './notifications.js'
 import { MemoryChatStore } from './store.js'
 import { EventChatAccess, type EventMembershipSource } from './event-membership.js'
+import type { ChatPersistence } from './postgres-chats.js'
 
 interface ServerOptions {
   devMode?: boolean
@@ -18,11 +19,14 @@ interface ServerOptions {
   verifyIdentity?: VerifyIdentity
   notifications?: NotificationStore
   eventMembership?: EventMembershipSource
+  chats?: ChatPersistence
 }
 
 export function createChatServer(options: ServerOptions = {}) {
   if (!options.devMode && !options.verifyIdentity) throw new Error('Firebase identity verification is not configured. Use CHAT_DEV_MODE=true only for local development.')
   if (!options.devMode && !options.eventMembership) throw new Error('Authoritative event membership is not configured.')
+  if (!options.devMode && !options.chats) throw new Error('Persistent chat storage is not configured.')
+  if (options.chats && !options.eventMembership) throw new Error('Persistent chat requires authoritative event membership.')
   const service = new ChatService(options.store ?? (options.eventMembership ? new MemoryChatStore() : createDemoStore()))
   const access = new EventChatAccess(service, options.eventMembership)
   const verify = options.verifyIdentity ?? demoIdentity
@@ -34,7 +38,23 @@ export function createChatServer(options: ServerOptions = {}) {
   const changed = (userIds: Iterable<string>) => {
     for (const userId of new Set(userIds)) io.to(room(userId)).emit('conversations:changed')
   }
+  const detail = async (id: string, userId: string) => {
+    if (options.chats) return options.chats.detail(id, userId)
+    await access.conversation(id, userId)
+    return service.GetGroupChat(id, userId)
+  }
+  const eventDetail = async (eventId: string, userId: string) => {
+    if (options.chats) return options.chats.event(eventId, userId)
+    return service.GetGroupChat((await access.event(eventId)).id, userId)
+  }
   const sendMessage = async (id: string, sender: string, body: unknown): Promise<ConversationMessage> => {
+    if (options.chats) {
+      // send() returns only after COMMIT. Failed writes emit nothing and receive
+      // an error acknowledgement; no memory fallback can disguise data loss.
+      const { message, recipients } = await options.chats.send(id, sender, body)
+      for (const userId of recipients) io.to(room(userId)).emit('message:created', message)
+      return message
+    }
     await access.conversation(id, sender)
     const recipients = await access.recipients(id)
     if (!recipients.includes(sender)) throw new HttpError(403, 'FORBIDDEN', 'Join this event before accessing its chat.')
@@ -49,7 +69,7 @@ export function createChatServer(options: ServerOptions = {}) {
 
   app.use(cors({ origin }))
   app.use(express.json({ limit: '16kb' }))
-  app.get('/health', (_request, response) => response.json({ service: 'chat-api', status: 'ok', storage: 'memory', membership: options.eventMembership ? 'events-postgresql' : 'demo-memory', notifications: options.notifications ? 'postgresql' : 'memory', auth: options.devMode ? 'development' : 'external' }))
+  app.get('/health', (_request, response) => response.json({ service: 'chat-api', status: 'ok', storage: options.chats ? 'postgresql' : 'memory', membership: options.eventMembership ? 'events-postgresql' : 'demo-memory', notifications: options.notifications ? 'postgresql' : 'memory', auth: options.devMode ? 'development' : 'external' }))
   app.use(async (request, response, next) => {
     try {
       const token = request.headers.authorization?.replace(/^Bearer\s+/i, '')
@@ -64,20 +84,22 @@ export function createChatServer(options: ServerOptions = {}) {
     next()
   }
 
-  app.get('/ListGroupChats', async (_request, response) => response.json({ items: await access.list(response.locals.userId) }))
+  app.get('/ListGroupChats', async (_request, response) => response.json({ items: options.chats ? await options.chats.list(response.locals.userId) : await access.list(response.locals.userId) }))
   app.get('/GetGroupChat/:id', async (request, response) => {
-    await access.conversation(request.params.id, response.locals.userId)
-    response.json(service.GetGroupChat(request.params.id, response.locals.userId))
+    response.json(await detail(request.params.id, response.locals.userId))
   })
   app.get('/conversations/:id/members', async (request, response) => {
-    await access.conversation(request.params.id, response.locals.userId)
-    response.json({ items: service.GetGroupChat(request.params.id, response.locals.userId).members })
+    response.json({ items: (await detail(request.params.id, response.locals.userId)).members })
   })
   app.get('/conversations/:id/messages', async (request, response) => {
     const { limit, before } = request.query
     if ((limit !== undefined && typeof limit !== 'string') || (before !== undefined && typeof before !== 'string')) throw new HttpError(400, 'INVALID_INPUT', 'Invalid message pagination parameters.')
-    await access.conversation(request.params.id, response.locals.userId)
-    response.json(service.history(request.params.id, response.locals.userId, limit === undefined ? 50 : Number(limit), before))
+    if (options.chats) {
+      response.json(await options.chats.history(request.params.id, response.locals.userId, limit === undefined ? 50 : Number(limit), before))
+    } else {
+      await access.conversation(request.params.id, response.locals.userId)
+      response.json(service.history(request.params.id, response.locals.userId, limit === undefined ? 50 : Number(limit), before))
+    }
   })
   app.post('/conversations/:id/messages', async (request, response) => {
     const message = await sendMessage(request.params.id, response.locals.userId, request.body?.body)
@@ -87,8 +109,12 @@ export function createChatServer(options: ServerOptions = {}) {
     const target = request.body?.userId
     if (typeof target !== 'string' || !target.trim()) throw new HttpError(400, 'INVALID_INPUT', 'Choose another user to message.')
     await access.user(target)
-    await access.canStartDirect(response.locals.userId, target)
-    const conversation = service.direct(response.locals.userId, request.body?.userId)
+    let conversation
+    if (options.chats) conversation = await options.chats.direct(response.locals.userId, target)
+    else {
+      await access.canStartDirect(response.locals.userId, target)
+      conversation = service.direct(response.locals.userId, target)
+    }
     changed(conversation.members.map((member) => member.userId))
     response.status(201).json(conversation)
   })
@@ -98,12 +124,11 @@ export function createChatServer(options: ServerOptions = {}) {
     response.sendStatus(204)
   })
   app.get('/events/:eventId/conversation', async (request, response) => {
-    const chat = await access.event(request.params.eventId)
-    response.json(service.GetGroupChat(chat.id, response.locals.userId))
+    response.json(await eventDetail(request.params.eventId, response.locals.userId))
   })
   app.post('/events/:eventId/conversation/membership', async (request, response) => {
     const conversation = options.eventMembership
-      ? service.GetGroupChat((await access.event(request.params.eventId)).id, response.locals.userId)
+      ? await eventDetail(request.params.eventId, response.locals.userId)
       : service.join(request.params.eventId, response.locals.userId)
     changed(conversation.members.map((member) => member.userId))
     response.json(conversation)
@@ -113,9 +138,9 @@ export function createChatServer(options: ServerOptions = {}) {
   // invents an event or writes an independent RSVP/membership record.
   app.post('/CreateGroupChat', developmentOnly, async (request, response) => {
     if (options.eventMembership) {
-      const existing = await access.event(request.body?.eventId)
+      const existing = await options.eventMembership.event(request.body?.eventId)
       if (existing.ownerUserId !== response.locals.userId) throw new HttpError(403, 'FORBIDDEN', 'Only the event organizer can create its chat.')
-      response.status(201).json(service.GetGroupChat(existing.id, response.locals.userId))
+      response.status(201).json(await eventDetail(request.body?.eventId, response.locals.userId))
       return
     }
     const conversation = service.CreateGroupChat(request.body?.eventId, request.body?.title, response.locals.userId)
@@ -199,6 +224,7 @@ export function createChatServer(options: ServerOptions = {}) {
     await options.notifications?.close?.()
     await new Promise<void>((resolve) => io.close(() => resolve()))
     await options.eventMembership?.close?.()
+    await options.chats?.close()
   }
   return { app, httpServer, io, service, close }
 }
