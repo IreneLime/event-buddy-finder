@@ -91,6 +91,7 @@ async function listEvents(path: string, token?: string, signal?: AbortSignal) {
 export const eventApi = {
   list: (token?: string, signal?: AbortSignal) => listEvents('/events?status=scheduled', token, signal),
   hosted: (token: string, signal?: AbortSignal) => listEvents('/me/events?role=hosted', token, signal),
+  interested: (token: string, signal?: AbortSignal) => listEvents('/me/events?role=attending&status=interested', token, signal),
   categories: async (signal?: AbortSignal) => {
     const result = await eventRequest<{ items: { id: string; name: string }[] }>('/categories', { signal })
     return result.items.map(({ name }) => name)

@@ -185,8 +185,15 @@ function ProfileDetails({ profile, isPrivate }: { profile: UserProfile; isPrivat
     if (!token) throw new Error('Please sign in again.')
     return eventApi.hosted(token, signal)
   }, [getToken])
+  const loadInterested = useCallback(async (signal: AbortSignal) => {
+    const token = await getToken()
+    if (!token) throw new Error('Please sign in again.')
+    const events = await eventApi.interested(token, signal)
+    return events.filter((event) => event.status === 'scheduled' && Date.parse(event.startsAt) > Date.now())
+  }, [getToken])
   const history = useApiResource(loadHistory)
   const hosted = useApiResource(isPrivate && eventsApiUrl ? loadHosted : null)
+  const interested = useApiResource(isPrivate && eventsApiUrl ? loadInterested : null)
   const own = isPrivate ? profile as CurrentUserProfile : undefined
 
   return <div className="space-y-6">
@@ -220,6 +227,13 @@ function ProfileDetails({ profile, isPrivate }: { profile: UserProfile; isPrivat
             <div className="flex gap-2">{page > 1 && <Button variant="outline" onClick={() => setPage(page - 1)}>Previous</Button>}
               {page * history.data.limit < history.data.total && <Button variant="outline" onClick={() => setPage(page + 1)}>Next</Button>}</div></>}
         </Card>
+        {isPrivate && eventsApiUrl && <Card className="space-y-4 p-5">
+          <h2 className="font-bold">Interested in</h2>
+          {interested.loading && <p role="status">Loading interested events…</p>}
+          {interested.error && <div role="alert">{interested.error} <Button size="sm" variant="outline" onClick={interested.retry}>Retry</Button></div>}
+          {interested.data?.length === 0 && <p className="text-sm text-stone-500">No upcoming events marked Interested.</p>}
+          <div className="grid gap-4 xl:grid-cols-2">{interested.data?.map((event) => <EventCard key={event.id} event={event} />)}</div>
+        </Card>}
         {isPrivate && eventsApiUrl && <Card className="space-y-4 p-5">
           <h2 className="font-bold">Events you host</h2>
           {hosted.loading && <p role="status">Loading hosted events…</p>}
