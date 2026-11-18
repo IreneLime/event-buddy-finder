@@ -16,8 +16,6 @@ export function mapPublicProfile(row: ProfileRow): UserProfile {
   return {
     id: row.firebase_uid,
     displayName: row.display_name,
-    ...(row.affiliation ? { affiliation: row.affiliation } : {}),
-    ...(row.age_range ? { ageRange: row.age_range } : {}),
     ...(row.bio ? { bio: row.bio } : {}),
     preferredCategories: row.preferred_categories ?? [],
   }
@@ -27,6 +25,8 @@ export function mapCurrentUserProfile(row: ProfileRow): CurrentUserProfile {
   return {
     ...mapPublicProfile(row),
     email: row.email,
+    ...(row.affiliation ? { affiliation: row.affiliation } : {}),
+    ...(row.age_range ? { ageRange: row.age_range } : {}),
     profileCompleted: row.profile_completed_at !== null,
   }
 }
