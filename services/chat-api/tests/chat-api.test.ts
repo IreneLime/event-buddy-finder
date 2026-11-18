@@ -42,6 +42,10 @@ test('health is public; protected routes and sockets require a valid identity', 
   assert.equal((await fetch(`${origin}/ListGroupChats`)).status, 401)
   assert.equal((await api('/ListGroupChats', 'unknown')).status, 401)
   assert.throws(() => createChatServer(), /identity verification/)
+  assert.throws(() => createChatServer({ verifyIdentity: async () => 'cathy', eventMembership: {
+    user: async () => ({ userId: 'cathy', displayName: 'Cathy' }),
+    event: async () => { throw new Error('Not used') }, forUser: async () => [],
+  } }), /Persistent chat storage/)
   const socket = io(origin, { auth: {}, reconnection: false, forceNew: true })
   sockets.push(socket)
   const [error] = await once(socket, 'connect_error', { signal: AbortSignal.timeout(3000) })

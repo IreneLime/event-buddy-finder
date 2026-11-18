@@ -1,6 +1,7 @@
 import { createChatServer } from './app.js'
 import { PostgresNotifications } from './notifications.js'
 import { PostgresEventMembership } from './event-membership.js'
+import { PostgresChats } from './postgres-chats.js'
 
 const port = Number(process.env.PORT ?? 4002)
 const host = process.env.HOST ?? '127.0.0.1'
@@ -8,10 +9,12 @@ const devMode = process.env.CHAT_DEV_MODE === 'true' && process.env.NODE_ENV !==
 const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/event_buddy_finder'
 const notifications = new PostgresNotifications(databaseUrl, devMode)
 const eventMembership = new PostgresEventMembership(databaseUrl, devMode)
-const { httpServer, close } = createChatServer({ devMode, webOrigin: process.env.WEB_ORIGIN, notifications, eventMembership })
+const chats = new PostgresChats(databaseUrl, devMode)
+const { httpServer, close } = createChatServer({ devMode, webOrigin: process.env.WEB_ORIGIN, notifications, eventMembership, chats })
 
 httpServer.listen(port, host, () => {
-  console.info(`Chat/notification service listening on http://${host}:${port} (PostgreSQL notifications, memory chat)`)
+  const address = httpServer.address()
+  console.info(`Chat/notification service listening on http://${host}:${typeof address === 'object' && address ? address.port : port} (PostgreSQL chats and notifications)`)
 })
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

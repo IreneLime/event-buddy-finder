@@ -68,14 +68,14 @@ function SessionProbe() {
   return <button onClick={() => void session.refresh()}>Refresh chat</button>
 }
 
-function mountPage(detail = false) {
+function mountPage(detail = false, conversationId = 'mina-dm') {
   const { AuthProvider } = auth
   const { ChatStoreProvider } = chat
   const { EventStoreProvider } = events
   const { ChatPage, ChatsPage } = pages
   render(<StrictMode><AuthProvider>
     <AccountControls />
-    <EventStoreProvider><MemoryRouter initialEntries={['/chats/mina-dm']}>
+    <EventStoreProvider><MemoryRouter initialEntries={[`/chats/${conversationId}`]}>
       <ChatStoreProvider><SessionProbe /><Routes>
         <Route path="/chats/:conversationId" element={detail ? <ChatPage /> : <ChatsPage />} />
       </Routes></ChatStoreProvider>
@@ -104,6 +104,54 @@ async function waitForMessage(body: string) {
 }
 
 describe('chat follows the signed-in account', () => {
+  for (const conversationId of ['mina-dm', 'chat-night-market']) {
+    it(`${conversationId}: renders another user's live messages without reloading history or losing the draft`, async () => {
+      mountPage(true, conversationId)
+      await logIn('cathy')
+      const transcript = await screen.findByRole('log', { name: 'Conversation messages' })
+      const composer = screen.getByRole('textbox', { name: 'Write a message' })
+      fireEvent.change(composer, { target: { value: 'My unsent plan' } })
+      const history = vi.spyOn(session.api, 'GetGroupChat').mockRejectedValue(new Error('Live messages must arrive through the socket'))
+      const peer = client.createChatSocket('mina')
+      try {
+        peer.connect()
+        await waitFor(() => expect(peer.connected).toBe(true))
+        const unrelatedId = conversationId === 'mina-dm' ? 'chat-night-market' : 'mina-dm'
+        await act(async () => { await client.sendChatMessage(peer, unrelatedId, 'A different conversation') })
+        let sent!: Awaited<ReturnType<typeof client.sendChatMessage>>
+        await act(async () => { sent = await client.sendChatMessage(peer, conversationId, 'Meet me at the entrance') })
+        await within(transcript).findByText('Meet me at the entrance')
+        expect(within(transcript).queryByText('A different conversation')).toBeNull()
+        // Repeat delivery must not render the same message twice.
+        await act(async () => {
+          const received = new Promise<void>((resolve) => session.socket.once('message:created', () => resolve()))
+          server.io.to('user:cathy').emit('message:created', sent)
+          await received
+        })
+        expect(within(transcript).getAllByText(sent.body)).toHaveLength(1)
+        expect(history).not.toHaveBeenCalled()
+        expect(screen.getByRole('log', { name: 'Conversation messages' })).toBe(transcript)
+        expect(screen.getByRole('textbox', { name: 'Write a message' })).toBe(composer)
+        expect(composer).toHaveProperty('value', 'My unsent plan')
+      } finally { peer.disconnect() }
+    })
+  }
+
+  it('reloads missed chat history on socket reconnect while keeping the same page open', async () => {
+    mountPage(true)
+    await logIn('cathy')
+    const transcript = await screen.findByRole('log', { name: 'Conversation messages' })
+    const socket = session.socket
+    await act(async () => { socket.disconnect() })
+    await waitFor(() => expect(session.connected).toBe(false))
+    const message = server.service.send('mina-dm', 'mina', 'Sent while Cathy was offline')
+    expect(within(transcript).queryByText(message.body)).toBeNull()
+    await act(async () => { socket.connect() })
+    await within(transcript).findByText(message.body)
+    expect(session.socket).toBe(socket)
+    expect(screen.getByRole('log', { name: 'Conversation messages' })).toBe(transcript)
+  })
+
   it('uses the saved Mina login immediately after a page reload', async () => {
     server.service.send('mina-dm', 'cathy', 'Previously sent by Cathy')
     window.localStorage.setItem('event-buddy-demo-user', 'mina')
