@@ -8,10 +8,15 @@ export interface EventSummary {
   id: string
   title: string
   description: string
+  notes?: string
   startsAt: string
   endsAt?: string
   locationName: string
+  /** City used to filter and group event discovery results. */
+  city?: string
   address?: string
+  latitude?: number
+  longitude?: number
   categoryNames: string[]
   imageUrl?: string
   priceAmount?: number

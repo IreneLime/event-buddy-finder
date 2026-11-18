@@ -4,13 +4,23 @@ The initial PostgreSQL schema is in `migrations/001_initial_schema.sql`. It mode
 
 ## Apply locally
 
-Create a PostgreSQL database, then run:
+Create a PostgreSQL database, then run the schema migrations in order:
 
 ```sh
 psql "$DATABASE_URL" -f database/migrations/001_initial_schema.sql
+psql "$DATABASE_URL" -f database/migrations/002_event_city_and_notes.sql
 ```
 
-The backend will be written in TypeScript and will use parameterized SQL queries through the PostgreSQL client selected by the team. The schema is SQL-first for now because the repository does not yet contain an application or ORM setup.
+For local API development, set `DATABASE_URL` and generate the Prisma client, then add fictional sample records and event/direct chat history with:
+
+```sh
+pnpm --filter @event-buddy/database db:generate
+pnpm --filter @event-buddy/database db:seed
+```
+
+The typed seed uses placeholder Firebase UIDs such as `demo-cathy`; it does not create Firebase Authentication accounts. It is development-only data, not real user information. Frontend-only demo accounts are defined separately in `apps/web/src/data/demo-users.ts` and do not call this database yet.
+
+The schema is maintained as PostgreSQL SQL migrations, with Prisma ORM 7 providing generated TypeScript models and typed database access for the TypeScript backend. The `@event-buddy/database` workspace package exports a shared Prisma client and model types for the Express services; generated client code is not committed. SQL migrations remain the source of truth for database constraints that Prisma's schema does not express, such as status checks.
 
 ## Design notes
 
