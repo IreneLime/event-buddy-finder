@@ -1,0 +1,15 @@
+%%{init: {"sequence": {"actorMargin": 80, "messageMargin": 35}}}%%
+sequenceDiagram
+    autonumber
+    actor User as Browser
+    participant API as Backend API
+    participant DB as PostgreSQL<br/>(local)
+    participant Spaces as DigitalOcean Spaces<br/>(cloud)
+
+    User->>API: Upload image
+    API->>Spaces: Store file
+    API->>DB: Save file key
+    note over User,Spaces: later, to view the image
+    API->>DB: Look up key
+    API->>Spaces: Request secure link
+    Spaces-->>User: Direct download
