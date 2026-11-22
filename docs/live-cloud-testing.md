@@ -17,6 +17,8 @@ Create a dedicated non-production Firebase project whose ID ends in `-ci`, enabl
 | `LIVE_SPACES_SECRET_ACCESS_KEY` | Matching Spaces secret |
 | `DEMO_DATABASE_URL` | Optional, seeded non-production PostgreSQL database named `event_buddy_demo_*` for persistent image publishing |
 | `DEMO_SPACES_BUCKET` | Optional Spaces bucket used for persistent demo photos |
+| `DEMO_SPACES_ACCESS_KEY_ID` | Access key scoped to the demo bucket for persistent image publishing |
+| `DEMO_SPACES_SECRET_ACCESS_KEY` | Matching demo-bucket access key secret |
 
 Do not use the production Firebase project or a production database. Keep the live workflow manual and restrict write access to the protected `live-integration` environment. Never add credentials to source files or workflow YAML.
 
@@ -28,14 +30,14 @@ The test uses Firebase’s Admin SDK to generate a verification action link with
 
 ## Publish the mock event photos
 
-The three committed photos correspond to `riverside-photo-walk`, `brampton-market`, and `toronto-clay-workshop`. To persist them, first ensure the `DEMO_DATABASE_URL` database has the current migrations and demo seeds. Run the workflow with mode `publish_demo_images`, then type `UPLOAD_DEMO_IMAGES`.
+The three committed photos correspond to `riverside-photo-walk`, `brampton-market`, and `toronto-clay-workshop`. To persist them, first ensure the `DEMO_DATABASE_URL` database has the current migrations and demo seeds. Run the workflow with mode `publish_demo_images`, then type `UPLOAD_DEMO_IMAGES`. This job uses the separate `DEMO_SPACES_*` access key, which should be scoped to the demo bucket; the `LIVE_SPACES_*` key is reserved for disposable live-flow checks.
 
 The job impersonates each seeded event owner only inside the dedicated CI Firebase project, sends each JPEG to `POST /events/:id/image`, and checks both the signed download and `events.image_object_key`. The image service writes the object key to PostgreSQL. The photos remain in Spaces and the keys remain in the configured demo database so Explore and event details can display them. The temporary Firebase fixture accounts are removed or restored after upload.
 
 To publish from a local seeded database instead, start the auth and image APIs with real test-project and Spaces configuration, then run:
 
 ```sh
-PUBLISH_DEMO_IMAGES_CONFIRM=UPLOAD_EVENT_BUDDY_DEMO_IMAGES \
+PUBLISH_DEMO_IMAGES_CONFIRM=UPLOAD_DEMO_IMAGES \
   pnpm --filter @event-buddy/image-api exec tsx scripts/publish-demo-images.ts --keep
 ```
 
