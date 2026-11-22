@@ -14,7 +14,7 @@ const ideas = [
 ]
 
 export function HomePage() {
-  const { events } = useEventStore()
+  const { events, loading, error, retry } = useEventStore()
   const { city } = useExploreCity()
   const featured = events
     .filter((event) => event.status === 'scheduled' && (event.city ?? 'Toronto') === city)
@@ -69,7 +69,7 @@ export function HomePage() {
           </div>
           <Link to="/events" className="hidden shrink-0 items-center gap-2 rounded-full border border-[#e8c9b2] bg-white px-4 py-2.5 text-sm font-bold text-[#85451f] transition hover:border-[#d99a6b] hover:bg-[#fffaf6] sm:inline-flex">Explore all events<ArrowRight size={16} /></Link>
         </div>
-        {featured.length > 0 ? <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{featured.map((event) => <EventCard key={event.id} event={event} />)}</div> : <div className="mt-8 rounded-3xl border border-dashed border-[#e8c9b2] bg-white/70 p-8 text-center"><p className="font-semibold text-stone-800">New plans are taking shape in {city}.</p><p className="mt-1 text-sm text-stone-500">Explore other cities or check back soon.</p><Button asChild variant="outline" className="mt-4"><Link to="/events">Browse events</Link></Button></div>}
+        {loading ? <p role="status" className="mt-8">Loading events…</p> : error ? <div role="alert" className="mt-8">{error} <Button variant="outline" onClick={retry}>Try again</Button></div> : featured.length > 0 ? <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{featured.map((event) => <EventCard key={event.id} event={event} />)}</div> : <div className="mt-8 rounded-3xl border border-dashed border-[#e8c9b2] bg-white/70 p-8 text-center"><p className="font-semibold text-stone-800">New plans are taking shape in {city}.</p><p className="mt-1 text-sm text-stone-500">Explore other cities or check back soon.</p><Button asChild variant="outline" className="mt-4"><Link to="/events">Browse events</Link></Button></div>}
         <div className="mt-5 text-center sm:hidden"><Link to="/events" className="inline-flex items-center gap-2 rounded-full border border-[#e8c9b2] bg-white px-4 py-2 text-sm font-bold text-[#85451f]">Explore all events<ArrowRight size={16} /></Link></div>
       </div>
     </section>
@@ -77,7 +77,7 @@ export function HomePage() {
     <section className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
       <div className="relative overflow-hidden rounded-[28px] bg-[#38261d] px-6 py-10 text-white sm:px-10 sm:py-12 lg:px-14">
         <div className="hero-glow hero-glow-one" aria-hidden="true" />
-          <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center"><div><p className="text-sm font-bold uppercase tracking-[.14em] text-brand-300">Your next story starts nearby</p><h2 className="mt-2 max-w-xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">Come for the event. Leave with a new connection.</h2></div><Button asChild size="lg" className="shrink-0 rounded-full bg-white text-stone-900 hover:bg-brand-50"><Link to="/events">Explore {city}<ArrowRight size={17} /></Link></Button></div>
+          <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center"><div><p className="text-sm font-bold uppercase tracking-[.14em] text-brand-300">Your next story starts nearby</p><h2 className="mt-2 max-w-xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">Come for the event. Leave with a new connection.</h2></div><Button asChild size="lg" className="shrink-0 rounded-full bg-white text-stone-900! hover:bg-brand-50 hover:text-stone-900!"><Link to="/events">Explore {city}<ArrowRight size={17} /></Link></Button></div>
       </div>
     </section>
   </div>

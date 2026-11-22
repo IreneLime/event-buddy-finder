@@ -12,7 +12,7 @@ Implements the in-app event alerts and optional browser alerts in proposal §2.6
 4. Open the bell → **View all notifications & settings**, or `/notifications`, to see saved updates, filter unread alerts, mark one/all read, and load older alerts.
 5. Optionally click **Enable browser alerts**. Permission is requested only on this click. Browser alerts work while the app is open, including in another tab; preferences are stored separately for each signed-in account.
 
-Demo: sign in as Mina in one browser profile and Cathy in another. Edit `/events/night-market` as Mina; Cathy receives an alert. Disconnect Cathy, edit again, and reconnect to see the saved update. The demo password is `demo1234`.
+Demo: sign in as Mina in one browser profile and Cathy in another. Edit `/events/night-market` as Mina; Cathy receives an alert. Disconnect Cathy, edit again, and reconnect to see the saved update. The demo password is `123`.
 
 ## Persistence and delivery
 
@@ -24,7 +24,7 @@ Demo: sign in as Mina in one browser profile and Cathy in another. Edit `/events
 - Publication is at least once: a crash between emission and updating `published_at` can repeat an event. The frontend deduplicates by notification ID. This prototype runs one notification publisher; multiple chat replicas require fan-out coordination before deployment.
 - Mark-read operations are scoped to the authenticated recipient. Changes are broadcast to that user's other connected tabs.
 - Event chat membership reads the same PostgreSQL event/RSVP records owned by events-api; new events resolve a chat automatically and withdrawal revokes reads, sends, and future delivery. See [chat membership and its integration regression](../services/chat-api/README.md).
-- The event frontend now reads and saves server records. Stable public IDs preserve seeded event links; generated events use their database ID. Chat messages continue to use the existing memory adapter; notification persistence is independent of chat history.
+- The event frontend now reads and saves server records. Stable public IDs preserve seeded event links; generated events use their database ID. Chat messages and direct conversations also persist in PostgreSQL; both chat history and notifications survive service restarts. See [chat persistence](../services/chat-api/README.md).
 
 ## Local setup
 

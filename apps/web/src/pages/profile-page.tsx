@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { ArrowLeft, CalendarDays, Camera, Edit3, Heart, MapPin, MessageCircle, Sparkles } from 'lucide-react'
 import { Avatar } from '../components/ui/avatar'
@@ -13,6 +13,8 @@ import { useAuth } from '../state/auth-store'
 import { useEventStore } from '../state/event-store'
 import { demoUsers } from '../data/demo-users'
 
+const LiveProfilePage = lazy(() => import('./live-profile-page').then(({ LiveProfilePage: Page }) => ({ default: Page })))
+
 const ageRanges = [
   { value: 'under_18', label: 'Under 18' },
   { value: '18_24', label: '18–24' },
@@ -22,13 +24,22 @@ const ageRanges = [
 ]
 
 export function ProfilePage() {
+  const { live } = useAuth()
+  const { userId } = useParams()
+  if (live || (userId && !demoUsers.some(({ id }) => id === userId))) {
+    return <Suspense fallback={<p role="status" className="p-8">Loading profile…</p>}><LiveProfilePage /></Suspense>
+  }
+  return <DemoProfilePage />
+}
+
+function DemoProfilePage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { userId } = useParams()
   const { user: signedInUser } = useAuth()
-  const { events } = useEventStore()
+  const { events, live: liveEvents } = useEventStore()
   const isEditing = location.pathname.endsWith('/edit')
-  const profile = userId ? demoUsers.find((candidate) => candidate.id === userId) : signedInUser
+  const profile = userId ? demoUsers.find((candidate) => candidate.id === userId) : demoUsers.find((candidate) => candidate.id === signedInUser?.id)
   const isOwnProfile = Boolean(signedInUser && (!userId || userId === signedInUser.id))
   const [name, setName] = useState(profile?.displayName ?? '')
   const [affiliation, setAffiliation] = useState(profile?.affiliation ?? '')
@@ -57,6 +68,9 @@ export function ProfilePage() {
 
   const hostedEvents = events.filter((event) => profile.hostedEventIds.includes(event.id))
   const joinedEvents = events.filter((event) => profile.attendedEventIds.includes(event.id))
+  const interestedEvents = isOwnProfile ? events.filter((event) => liveEvents
+    ? event.viewerParticipation === 'interested' && Date.parse(event.startsAt) > Date.now()
+    : profile.interestedEventIds.includes(event.id)) : []
 
   if (isEditing) return <div className="mx-auto max-w-3xl space-y-6">
     <Button asChild variant="ghost" size="sm"><Link to="/profile"><ArrowLeft size={15} />Back to profile</Link></Button>
@@ -80,7 +94,20 @@ export function ProfilePage() {
         <Card className="p-5"><p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-400">Community activity</p><div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-xl bg-stone-50 p-3"><p className="text-2xl font-bold text-stone-900">{hostedEvents.length}</p><p className="mt-1 text-[11px] text-stone-500">events hosted</p></div><div className="rounded-xl bg-brand-50 p-3"><p className="text-2xl font-bold text-brand-700">{profile.eventHistory.length + joinedEvents.length}</p><p className="mt-1 text-[11px] text-stone-500">events joined</p></div></div></Card>
       </aside>
       <div className="space-y-6">
-        <Card className="p-5 sm:p-6"><div className="flex items-center justify-between"><div><h2 className="font-bold text-stone-900">Events they’ve been to</h2><p className="mt-1 text-xs text-stone-500">A few recent outings shared on this public profile</p></div><Heart size={18} className="text-brand-500" /></div><div className="mt-5 grid gap-3 sm:grid-cols-2">{profile.eventHistory.map((item) => <article key={item.title} className="rounded-xl border border-stone-100 bg-[#fdfcfb] p-4"><div className="flex items-center justify-between gap-2"><Badge className="bg-brand-50 text-brand-700">{item.category}</Badge><span className="text-[10px] text-stone-400">{item.date}</span></div><h3 className="mt-3 text-sm font-bold text-stone-800">{item.title}</h3><p className="mt-1 flex items-center gap-1.5 text-xs text-stone-500"><MapPin size={12} />{item.venue}</p></article>)}</div>{joinedEvents.length > 0 && <div className="mt-3 grid gap-4 sm:grid-cols-2">{joinedEvents.map((event) => <EventCard key={event.id} event={event} />)}</div>}</Card>
+        <Card className="p-5 sm:p-6"><div className="flex items-center justify-between"><div><h2 className="font-bold text-stone-900">Past events</h2><p className="mt-1 text-xs text-stone-500">A few recent outings shared on this public profile</p></div><Heart size={18} className="text-brand-500" /></div><div className="mt-5 grid gap-3 sm:grid-cols-2">{profile.eventHistory.map((item) => <article key={item.title} className="rounded-xl border border-stone-100 bg-[#fdfcfb] p-4"><div className="flex items-center justify-between gap-2"><Badge className="bg-brand-50 text-brand-700">{item.category}</Badge><span className="text-[10px] text-stone-400">{item.date}</span></div><h3 className="mt-3 text-sm font-bold text-stone-800">{item.title}</h3><p className="mt-1 flex items-center gap-1.5 text-xs text-stone-500"><MapPin size={12} />{item.venue}</p></article>)}</div></Card>
+        {isOwnProfile && <Card className="space-y-4 p-5 sm:p-6">
+          <h2 className="font-bold text-stone-900">Interested in</h2>
+          {interestedEvents.length === 0 && <p className="text-sm text-stone-500">No upcoming events marked Interested.</p>}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {interestedEvents.map((event) => <EventCard key={event.id} event={event} />)}
+          </div>
+        </Card>}
+        {joinedEvents.length > 0 && <Card className="space-y-4 p-5 sm:p-6">
+          <h2 className="font-bold text-stone-900">Going to</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {joinedEvents.map((event) => <EventCard key={event.id} event={event} />)}
+          </div>
+        </Card>}
         {hostedEvents.length > 0 && <Card className="p-5 sm:p-6"><div className="flex items-center justify-between"><div><h2 className="font-bold text-stone-900">Events hosted</h2><p className="mt-1 text-xs text-stone-500">Upcoming public events organized by {profile.displayName}</p></div><CalendarDays size={18} className="text-stone-400" /></div><div className="mt-5 grid gap-4 sm:grid-cols-2">{hostedEvents.map((event) => <EventCard key={event.id} event={event} />)}</div></Card>}
       </div>
     </div>

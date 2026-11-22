@@ -43,7 +43,7 @@ Run just one app with `pnpm dev:web`, `pnpm dev:auth`, `pnpm dev:users`, `pnpm d
 - `/notifications` — saved event alerts and browser notification settings
 - `/profile` and `/profile/:userId` — profile view; edit profile is linked from the current user's page
 
-Chat messages currently use the chat service's memory store. Event participation and notifications use the consolidated PostgreSQL schema. See [real-time event notifications](docs/realtime-event-notifications.md).
+Event participation, notifications, conversations, and messages use the consolidated PostgreSQL schema. Chat messages persist across service restarts; access is checked against the current event RSVP or direct-chat participants. See [real-time event notifications](docs/realtime-event-notifications.md) and [chat persistence](services/chat-api/README.md).
 
 ## Contributing
 

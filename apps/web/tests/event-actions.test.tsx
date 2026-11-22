@@ -8,7 +8,18 @@ import { EventFormPage } from '../src/pages/event-form-page'
 import { EventDetailPage } from '../src/pages/event-detail-page'
 
 const api = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), cancel: vi.fn(), participate: vi.fn() }))
-vi.mock('../src/lib/events-api', () => ({ createEventsApi: () => api }))
+vi.mock('../src/lib/backend-api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/lib/backend-api')>(),
+  eventsApiUrl: 'http://localhost:4001',
+  eventApi: {
+    ...api,
+    save: (body: unknown, _token: string, id?: string) => id ? api.update(id, body) : api.create(body),
+    categories: async () => ['Food', 'Community'],
+    hosted: async () => [],
+    participants: async () => ({ total: 2, items: [] }),
+  },
+  imageApi: { get: async () => ({}) },
+}))
 vi.mock('../src/components/events-map', () => ({ EventMapPreview: () => <div>Map preview</div> }))
 
 let event: EventSummary
@@ -23,7 +34,9 @@ beforeEach(() => {
     organizerName: 'Mina Park', organizerUserId: 'demo-mina', participantCount: 2, status: 'scheduled', priceAmount: 0,
   }
   api.list.mockImplementation(async () => [event])
+  api.get.mockImplementation(async () => event)
   api.update.mockImplementation(async (_id, body) => ({ ...event, ...body }))
+  api.create.mockImplementation(async (body) => ({ ...event, ...body, id: 'created-event' }))
   api.cancel.mockImplementation(async () => ({ ...event, status: 'cancelled' }))
   api.participate.mockImplementation(async (_id, status) => ({ ...event, viewerParticipation: status }))
 })
@@ -31,9 +44,16 @@ afterEach(cleanup)
 
 function SavedEvent() { return <h1>Saved event {useParams().eventId}</h1> }
 function mount(edit: boolean) {
-  render(<AuthProvider><EventStoreProvider><MemoryRouter initialEntries={[edit ? '/events/night-market/edit' : '/events/night-market']}><Routes>
+  return render(<AuthProvider><EventStoreProvider><MemoryRouter initialEntries={[edit ? '/events/night-market/edit' : '/events/night-market']}><Routes>
     <Route path="/events/:eventId/edit" element={<EventFormPage />} />
     <Route path="/events/:eventId" element={edit ? <SavedEvent /> : <EventDetailPage />} />
+  </Routes></MemoryRouter></EventStoreProvider></AuthProvider>)
+}
+
+function mountCreate() {
+  return render(<AuthProvider><EventStoreProvider><MemoryRouter initialEntries={['/events/new']}><Routes>
+    <Route path="/events/new" element={<EventFormPage />} />
+    <Route path="/events/:eventId" element={<SavedEvent />} />
   </Routes></MemoryRouter></EventStoreProvider></AuthProvider>)
 }
 
@@ -46,6 +66,53 @@ it('saves event edits through the backend without shifting time or dropping exis
   expect(api.update).toHaveBeenCalledWith('night-market', expect.objectContaining({
     title: 'Updated market title', startsAt: event.startsAt, endsAt: event.endsAt,
     categoryNames: ['Food', 'Community'], city: 'Toronto', notes: 'Meet at the entrance.',
+  }))
+})
+
+it('clears an existing optional end time by sending null to the API', async () => {
+  const { container } = mount(true)
+  await screen.findByDisplayValue(event.title)
+  const endTime = container.querySelectorAll<HTMLInputElement>('input[type="datetime-local"]')[1]
+  expect(endTime.value).not.toBe('')
+  fireEvent.change(endTime, { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+  await screen.findByRole('heading', { name: 'Saved event night-market' })
+  expect(api.update).toHaveBeenCalledWith('night-market', expect.objectContaining({ endsAt: null }))
+})
+
+it('leaves an event without an end time blank during title-only edits', async () => {
+  event = { ...event, endsAt: undefined }
+  const { container } = mount(true)
+  const title = await screen.findByDisplayValue(event.title)
+  const endTime = container.querySelectorAll<HTMLInputElement>('input[type="datetime-local"]')[1]
+  expect(endTime.value).toBe('')
+  fireEvent.change(title, { target: { value: 'Updated without an end time' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+  await screen.findByRole('heading', { name: 'Saved event night-market' })
+  expect(api.update).toHaveBeenCalledWith('night-market', expect.objectContaining({
+    title: 'Updated without an end time', endsAt: null,
+  }))
+})
+
+it('keeps the optional end time blank when a new event start date changes', async () => {
+  const { container } = mountCreate()
+  fireEvent.change(await screen.findByPlaceholderText('e.g. Sunday Clay Club'), { target: { value: 'A month-away park walk' } })
+  fireEvent.change(screen.getByPlaceholderText('Tell people what makes this event special…'), {
+    target: { value: 'A relaxed walk with time to meet neighbours and enjoy the park.' },
+  })
+  const dateTimeFields = container.querySelectorAll<HTMLInputElement>('input[type="datetime-local"]')
+  const futureStart = new Date(Date.now() + 30 * 24 * 60 * 60_000)
+  const localStart = new Date(futureStart.getTime() - futureStart.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+  fireEvent.change(dateTimeFields[0]!, { target: { value: localStart } })
+  expect(dateTimeFields[1]!.value).toBe('')
+  fireEvent.change(container.querySelector('form select')!, { target: { value: 'Community' } })
+  fireEvent.change(container.querySelectorAll('form select')[1]!, { target: { value: 'Toronto' } })
+  fireEvent.change(screen.getByPlaceholderText('Place or venue name'), { target: { value: 'Trinity Bellwoods Park' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Post event' }))
+  await screen.findByRole('heading', { name: 'Saved event created-event' })
+  expect(api.create).toHaveBeenCalledWith(expect.objectContaining({
+    startsAt: new Date(dateTimeFields[0]!.value).toISOString(),
+    endsAt: undefined,
   }))
 })
 
@@ -64,8 +131,8 @@ it('requires explicit confirmation before cancelling and then shows the saved ca
   fireEvent.click(await screen.findByRole('button', { name: 'Cancel event' }))
   expect(api.cancel).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
-  await waitFor(() => expect(api.cancel).toHaveBeenCalledWith('night-market'))
-  await screen.findByText('This event has been cancelled. Existing notifications remain in your inbox.')
+  await waitFor(() => expect(api.cancel).toHaveBeenCalledWith('night-market', 'dev:demo-mina'))
+  await screen.findByText('This event has been cancelled.')
   expect(screen.queryByRole('button', { name: 'Cancel event' })).toBeNull()
 })
 
@@ -73,9 +140,9 @@ it('saves notification eligibility when a user marks interest and withdraws it o
   window.localStorage.setItem('event-buddy-demo-user', 'cathy')
   mount(false)
   fireEvent.click(await screen.findByRole('button', { name: 'Interested' }))
-  await waitFor(() => expect(api.participate).toHaveBeenCalledWith('night-market', 'interested'))
-  await screen.findByText("You're marked interested for this event.")
+  await waitFor(() => expect(api.participate).toHaveBeenCalledWith('night-market', 'interested', 'dev:demo-cathy'))
+  await screen.findByText("Marked as interested.")
   fireEvent.click(screen.getByRole('button', { name: 'Interested' }))
-  await waitFor(() => expect(api.participate).toHaveBeenLastCalledWith('night-market', 'withdrawn'))
-  await screen.findByText('You will no longer receive new updates for this event.')
+  await waitFor(() => expect(api.participate).toHaveBeenLastCalledWith('night-market', 'withdrawn', 'dev:demo-cathy'))
+  await screen.findByText('Your RSVP was cleared.')
 })
