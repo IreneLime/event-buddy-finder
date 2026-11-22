@@ -43,7 +43,7 @@ afterEach(cleanup)
 
 function SavedEvent() { return <h1>Saved event {useParams().eventId}</h1> }
 function mount(edit: boolean) {
-  render(<AuthProvider><EventStoreProvider><MemoryRouter initialEntries={[edit ? '/events/night-market/edit' : '/events/night-market']}><Routes>
+  return render(<AuthProvider><EventStoreProvider><MemoryRouter initialEntries={[edit ? '/events/night-market/edit' : '/events/night-market']}><Routes>
     <Route path="/events/:eventId/edit" element={<EventFormPage />} />
     <Route path="/events/:eventId" element={edit ? <SavedEvent /> : <EventDetailPage />} />
   </Routes></MemoryRouter></EventStoreProvider></AuthProvider>)
