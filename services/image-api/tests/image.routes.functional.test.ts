@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   authenticate: vi.fn(),
+  resolveEventImageId: vi.fn(),
   getProfileImageKey: vi.fn(),
   replaceProfileImageKey: vi.fn(),
   getEventImageKey: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock('../src/services/auth-client.js', () => ({
   authenticateWithAuthApi: mocks.authenticate,
 }))
 vi.mock('../src/modules/images/image.repository.js', () => ({
+  resolveEventImageId: mocks.resolveEventImageId,
   getProfileImageKey: mocks.getProfileImageKey,
   replaceProfileImageKey: mocks.replaceProfileImageKey,
   getEventImageKey: mocks.getEventImageKey,
@@ -40,6 +42,7 @@ beforeEach(() => {
     email: 'user@example.com',
     emailVerified: true,
   })
+  mocks.resolveEventImageId.mockResolvedValue('9')
   mocks.getProfileImageKey.mockResolvedValue('profile-images/user-1/current.png')
   mocks.replaceProfileImageKey.mockResolvedValue({ previousKey: null })
   mocks.getEventImageKey.mockResolvedValue('event-images/9/current.png')

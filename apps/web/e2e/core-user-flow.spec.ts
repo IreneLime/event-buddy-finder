@@ -26,12 +26,14 @@ function monitorUnexpectedApiErrors(page: Page, errors: string[]) {
   page.on('response', (response) => {
     const url = new URL(response.url())
     if (!backendPorts.has(url.port)) return
-    // No image object is attached to these fresh test profiles/events, so the
-    // image API's 404 is the normal fallback path. All other API failures fail.
+    // Missing profiles are expected between Firebase signup and profile setup;
+    // missing/unconfigured cloud images use the image API's fallback path.
+    const expectedProfileNotCreatedYet = response.status() === 404 &&
+      url.port === '4104' && url.pathname === '/me/profile'
     const expectedGuestAuthRejection = response.status() === 401 &&
       url.port === '4102' && ['/ListGroupChats', '/me/notifications'].includes(url.pathname)
     const expectedMissingCloudImage = url.port === '4105' && [404, 503].includes(response.status())
-    if (response.status() >= 400 && !expectedGuestAuthRejection && !expectedMissingCloudImage) {
+    if (response.status() >= 400 && !expectedProfileNotCreatedYet && !expectedGuestAuthRejection && !expectedMissingCloudImage) {
       errors.push(`${response.status()} ${url.pathname}`)
     }
   })
