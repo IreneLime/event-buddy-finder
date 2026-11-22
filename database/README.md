@@ -28,6 +28,7 @@ The typed seed uses placeholder Firebase UIDs such as `demo-cathy`; it does not 
 - An event has an individual creator, category names, and an optional image object key. Group-owned events and group profiles are outside the initial scope.
 - `event_participations` has at most one row per user and event, with a status of `interested`, `pending_approval`, `going`, `declined`, or `withdrawn`. Attendees can mark themselves interested or going without organizer approval; event cancellation is tracked separately.
 - Event-chat access is derived from the event creator and eligible RSVP status. Direct conversations store exactly two distinct participants in canonical order. Messages refer to a conversation and sender. The backend enforces access when listing or sending messages.
+- Event-chat sends and RSVP upserts acquire the same transaction-scoped advisory lock, keyed by `hashtextextended('event-membership:' || event_id::text, 0)`, before reading or changing participation. This serializes even a creator's first withdrawal with no existing RSVP row. Withdrawal that locks first commits before a waiting send selects its sender and recipients.
 - Event updates and cancellations insert persistent inbox notifications for affected interested, pending, or going participants. `published_at` tracks delivery to connected users; the Socket.IO worker can retry unclaimed notifications after a restart.
 - `profile_image_key` and `events.image_object_key` store DigitalOcean Spaces object keys. Image bytes stay in Spaces; the TypeScript image service uploads, downloads, and associates object keys with their profile or event record.
 - Date, city, RSVP, chat-pagination, and inbox indexes support the principal access paths. Category arrays use GIN indexes.
@@ -41,3 +42,9 @@ psql "$DATABASE_URL" -f database/seeds/001_demo_images.sql
 ```
 
 The image seed is idempotent and development-only; do not apply it in production.
+
+## Chat persistence and schema consolidation
+
+The persistent chat adapter uses the six-table schema from migrations 001–004, including the consolidation merged in [#15](https://github.com/IreneLime/event-buddy-finder/pull/15). Direct conversations use `participant_one_user_id` and `participant_two_user_id`; event access comes from current RSVP records. Message writes do not use the removed `conversation_members` table. Notifications retain pending delivery state in `notifications.published_at`.
+
+The chat persistence from [#17](https://github.com/IreneLime/event-buddy-finder/pull/17) is adapted to that schema on this branch. Run `TEST_DATABASE_URL=... pnpm test:realtime:db` and `TEST_DATABASE_URL=... pnpm test:e2e:chat` before integration. These checks include actual group/DM process-restart recovery, seeded history, concurrent withdrawal, and failed commits against the consolidated tables. No additional schema migration is introduced by the chat adapter.

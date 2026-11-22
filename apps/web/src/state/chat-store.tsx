@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import type { ConversationSummary, NotificationItem } from '@event-buddy/contracts'
+import type { ConversationMessage, ConversationSummary, NotificationItem } from '@event-buddy/contracts'
 import { chatError, createChatApi, createChatSocket } from '../lib/chat-api'
 import { ChatContext } from './chat-context'
 import { useAuth } from './auth-store'
@@ -12,6 +12,16 @@ function mergeAlerts(current: NotificationItem[], incoming: NotificationItem[]) 
 
 function browserPermission() { return typeof Notification === 'undefined' ? 'unsupported' as const : Notification.permission }
 
+function latestMessage(a: ConversationMessage | undefined, b: ConversationMessage | undefined) {
+  if (!a) return b
+  if (!b) return a
+  return (a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id, undefined, { numeric: true })) >= 0 ? a : b
+}
+
+function sortConversations(items: ConversationSummary[]) {
+  return items.sort((a, b) => (b.lastMessage?.createdAt ?? b.createdAt).localeCompare(a.lastMessage?.createdAt ?? a.createdAt))
+}
+
 export function ChatStoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   return <ChatSession key={user?.id ?? 'signed-out'} userId={user?.id}>{children}</ChatSession>
@@ -22,6 +32,11 @@ function ChatSession({ userId, children }: { userId: string | undefined; childre
   const [chatApi] = useState(() => createChatApi(userId))
   const [socket] = useState(() => createChatSocket(userId))
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const conversationList = useRef<ConversationSummary[]>([])
+  const replaceConversations = useCallback((items: ConversationSummary[]) => {
+    conversationList.current = items
+    setConversations(items)
+  }, [])
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [nextNotificationCursor, setNextNotificationCursor] = useState<string>()
@@ -47,7 +62,12 @@ function ChatSession({ userId, children }: { userId: string | undefined; childre
     try {
       const [chats, inbox] = await Promise.all([chatApi.ListGroupChats(), chatApi.notifications()])
       if (request !== generation.current) return
-      setConversations(chats.items)
+      // A socket message may arrive while this list request is in flight. Keep
+      // its newer preview, but let the server decide which chats still exist.
+      const current = new Map(conversationList.current.map((item) => [item.id, item]))
+      replaceConversations(sortConversations(chats.items.map((item) => ({
+        ...item, lastMessage: latestMessage(item.lastMessage, current.get(item.id)?.lastMessage),
+      }))))
       setNotifications(inbox.items)
       for (const item of inbox.items) seenAlerts.current.add(item.id)
       setUnreadCount(inbox.unreadCount)
@@ -55,7 +75,7 @@ function ChatSession({ userId, children }: { userId: string | undefined; childre
       setError('')
     } catch (error) { if (request === generation.current) setError(chatError(error)) }
     finally { if (request === generation.current) setLoading(false) }
-  }, [chatApi, userId])
+  }, [chatApi, replaceConversations, userId])
 
   // RSVP/event changes from the events API invalidate chat membership as well.
   useEffect(() => {
@@ -100,7 +120,13 @@ function ChatSession({ userId, children }: { userId: string | undefined; childre
     const disconnect = () => setConnected(false)
     const failure = (error: Error) => { setConnected(false); setError(chatError(error)); setLoading(false) }
     const changed = () => { setRevision((value) => value + 1); void refresh() }
-    const message = () => { void refresh() }
+    const message = (incoming: ConversationMessage) => {
+      const current = conversationList.current
+      if (!current.some((item) => item.id === incoming.conversationId)) { void refresh(); return }
+      replaceConversations(sortConversations(current.map((item) => item.id === incoming.conversationId
+        ? { ...item, lastMessage: latestMessage(item.lastMessage, incoming) } : item)))
+    }
+    const notificationsChanged = () => { void refresh() }
     const notificationCreated = (notification: NotificationItem) => {
       if (!seenAlerts.current.has(notification.id)) {
         seenAlerts.current.add(notification.id)
@@ -119,16 +145,16 @@ function ChatSession({ userId, children }: { userId: string | undefined; childre
     }
     socket.on('connect', connect).on('disconnect', disconnect).on('connect_error', failure)
     socket.on('conversations:changed', changed).on('message:created', message)
-    socket.on('notification:created', notificationCreated).on('notifications:changed', message)
+    socket.on('notification:created', notificationCreated).on('notifications:changed', notificationsChanged)
     socket.connect()
     return () => {
       generation.current += 1
       socket.off('connect', connect).off('disconnect', disconnect).off('connect_error', failure)
       socket.off('conversations:changed', changed).off('message:created', message)
-      socket.off('notification:created', notificationCreated).off('notifications:changed', message)
+      socket.off('notification:created', notificationCreated).off('notifications:changed', notificationsChanged)
       socket.disconnect()
     }
-  }, [refresh, refreshEvents, socket, userId])
+  }, [refresh, refreshEvents, replaceConversations, socket, userId])
 
   return <ChatContext.Provider value={{ userId, api: chatApi, socket, conversations, notifications, unreadCount,
     nextNotificationCursor, liveAlerts, dismissAlert: (id) => setLiveAlerts((current) => current.filter((item) => item.id !== id)),

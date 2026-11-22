@@ -43,7 +43,9 @@ Run just one app with `pnpm dev:web`, `pnpm dev:auth`, `pnpm dev:users`, `pnpm d
 - `/notifications` — saved event alerts and browser notification settings
 - `/profile` and `/profile/:userId` — profile view; edit profile is linked from the current user's page
 
-Chat messages currently use the chat service's memory store. Event participation and notifications use the consolidated PostgreSQL schema. See [real-time event notifications](docs/realtime-event-notifications.md).
+Chat messages, direct conversations, and notifications persist in PostgreSQL across service restarts. Event access follows the authoritative RSVP records. See [chat and notifications](services/chat-api/README.md) and [regression tests](docs/realtime-testing.md).
+
+Run `TEST_DATABASE_URL=... pnpm test:e2e:chat` for Chromium group-chat, public-profile DM, and notification journeys against a disposable PostgreSQL database, including real chat service restarts. See [browser test setup and standalone DM checks](tests/e2e/README.md).
 
 ## Contributing
 
