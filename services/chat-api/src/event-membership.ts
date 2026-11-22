@@ -80,8 +80,8 @@ export class PostgresEventMembership implements EventMembershipSource {
   async close() { await this.pool.end() }
 }
 
-// Materialized metadata for the isolated memory fixture. Normal startup uses
-// PostgresChats, which reads the same current RSVP authority inside transactions.
+// Materialized metadata is only for rendering and the existing memory message
+// adapter. Every externally accessible event-chat operation refreshes authority.
 export class EventChatAccess {
   constructor(private service: ChatService, private source?: EventMembershipSource) {}
 

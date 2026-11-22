@@ -1,9 +1,9 @@
 # Chat and Notifications API
 
 Express and Socket.IO chat with event membership read from the authoritative
-PostgreSQL records owned by events-api. Chat messages, direct conversations,
-and notifications persist in PostgreSQL across service restarts. Firebase sessions
-are verified through the auth API. Demo identity headers are development-only.
+PostgreSQL records owned by events-api. Chat messages and direct conversations
+still use the memory adapter; event RSVP permissions and notifications do not.
+Firebase sessions are verified through the auth API. Demo identity headers are development-only.
 
 ## Run
 
@@ -40,30 +40,13 @@ to hard-coded chat fixtures. For Firebase locally, run `CHAT_DEV_MODE=false pnpm
 - After a committed withdrawal, REST reads/writes and already connected Socket.IO
   sends are rejected, and subsequent messages are not delivered to that user.
   Already received messages cannot be retracted from a client.
-- Event-chat sends and RSVP upserts take the same event-scoped transaction
-  advisory lock before reading or changing participation. A withdrawal that locks
-  first commits before a waiting send checks the sender and recipients, including
-  a creator's first withdrawal with no existing RSVP row.
-- Messages commit before delivery and acknowledgement; failed commits emit no
-  message and return a storage error. Concurrent reverse DM requests reuse one
-  conversation through an ordered-pair advisory lock and the schema's unique index.
 - Failed database lookups return 503 and never fall back to cached permissions.
   All authority reads complete before a message is saved or acknowledged.
 - Joining/leaving from the frontend also writes through events-api. An RSVP update
   refreshes chat state and invalidates the open chat view. A lookup never silently
   re-enrolls a withdrawn user.
 - Restarting chat preserves event membership and stable conversation IDs, while
-  messages and direct conversations persist in PostgreSQL.
-- The consolidated schema stores each direct chat's ordered pair in the two
-  participant columns on `conversations`; event-chat membership is always
-  derived from the event owner and current RSVP. Messages do not depend on a
-  membership table, so leaving an event chat revokes access without deleting
-  message history. Foreign keys restrict hard deletion of accounts referenced
-  by chat history.
-- The PostgreSQL persistence tests apply migrations 001–004 and verify that
-  seeded event/direct history survives, direct chats use the consolidated
-  participant columns, and a profile referenced by chat history cannot be
-  hard-deleted.
+  in-memory message history/direct conversations still reset.
 
 ## API
 
@@ -88,9 +71,8 @@ only resolves an existing membership; it does not change RSVP status.
 `409 USE_EVENTS_API`. Development-only `POST /CreateGroupChat` resolves a real
 owned event and cannot invent one. The standalone `createChatServer({ devMode:
 true })` memory fixture remains for isolated tests; the normal startup always
-injects `PostgresChats` and `PostgresEventMembership`, including in development.
-Production startup requires an identity verifier, an authoritative membership
-source, and persistent chat storage. `/health` reports `storage: postgresql`.
+injects `PostgresEventMembership`, including in development. Production startup
+requires both an identity verifier and an authoritative membership source.
 
 Socket.IO `message:send` accepts `{ conversationId, body }` and acknowledges a
 saved message or error. The sender comes from the verified socket identity.
@@ -111,14 +93,12 @@ Socket.IO requests, using migrations 001–004 in a disposable database:
 
 ```sh
 TEST_DATABASE_URL="$DATABASE_URL" pnpm --filter @event-buddy/chat-api test:membership
-TEST_DATABASE_URL="$DATABASE_URL" pnpm --filter @event-buddy/chat-api test:persistence
 ```
 
 `TEST_DATABASE_URL` must identify a PostgreSQL server on which the test user can
 create a temporary database. The suite creates its own schema/profiles, exercises
 real event creation and RSVP endpoints, verifies REST/socket revocation, restart,
 and fail-closed behavior, and drops only its own test database. The general test
-command skips these suites without `TEST_DATABASE_URL`; the explicit database
-commands require it. Persistence tests restart the actual server process and
-verify group/direct history, seeded data, pagination, withdrawal, and failed commits. `EVENTS_API_TEST_ROOT` optionally selects a separate events-api checkout for
+command skips this suite without `TEST_DATABASE_URL`; `test:membership` requires
+it. `EVENTS_API_TEST_ROOT` optionally selects a separate events-api checkout for
 compatibility testing; by default the suite uses this repository's events-api.

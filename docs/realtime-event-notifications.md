@@ -24,7 +24,7 @@ Demo: sign in as Mina in one browser profile and Cathy in another. Edit `/events
 - Publication is at least once: a crash between emission and updating `published_at` can repeat an event. The frontend deduplicates by notification ID. This prototype runs one notification publisher; multiple chat replicas require fan-out coordination before deployment.
 - Mark-read operations are scoped to the authenticated recipient. Changes are broadcast to that user's other connected tabs.
 - Event chat membership reads the same PostgreSQL event/RSVP records owned by events-api; new events resolve a chat automatically and withdrawal revokes reads, sends, and future delivery. See [chat membership and its integration regression](../services/chat-api/README.md).
-- The event frontend now reads and saves server records. Stable public IDs preserve seeded event links; generated events use their database ID. Chat messages and direct conversations also persist in PostgreSQL; both chat history and notifications survive service restarts. See [chat persistence](../services/chat-api/README.md).
+- The event frontend now reads and saves server records. Stable public IDs preserve seeded event links; generated events use their database ID. Chat messages continue to use the existing memory adapter; notification persistence is independent of chat history.
 
 ## Local setup
 

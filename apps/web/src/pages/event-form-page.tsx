@@ -50,7 +50,7 @@ function EventEditor({ event }: { event?: EventSummary }) {
   const [startsAt, setStartsAt] = useState(localDateTime(event?.startsAt))
   const [endsAt, setEndsAt] = useState(() => {
     if (event) return event.endsAt ? localDateTime(event.endsAt) : ''
-    const start = new Date(Date.now() + 24 * 60 * 60_000)
+    const start = event?.startsAt ? new Date(event.startsAt) : new Date(Date.now() + 24 * 60 * 60_000)
     return localDateTime(new Date(start.getTime() + 2 * 60 * 60_000).toISOString())
   })
   const [price, setPrice] = useState(event?.priceAmount?.toString() ?? '0')

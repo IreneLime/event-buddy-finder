@@ -41,30 +41,18 @@ export async function upsertParticipation(
   userId: string,
   status: ParticipationStatus,
 ): Promise<ParticipationStatus> {
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-    // Match chat-api's send lock, including the first RSVP for an organizer
-    // whose access was implicit. Keep it until the membership change commits.
-    await client.query("SELECT pg_advisory_xact_lock(hashtextextended('event-membership:' || $1::text, 0))", [eventId])
-    const result = await client.query<{ status: ParticipationStatus }>(
-      `
-        INSERT INTO event_participations (event_id, user_id, status)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (event_id, user_id)
-        DO UPDATE SET status = EXCLUDED.status, updated_at = NOW()
-        RETURNING status
-      `,
-      [eventId, userId, status],
-    )
-    await client.query('COMMIT')
-    return result.rows[0]!.status
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {})
-    throw error
-  } finally {
-    client.release()
-  }
+  const result = await pool.query<{ status: ParticipationStatus }>(
+    `
+      INSERT INTO event_participations (event_id, user_id, status)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (event_id, user_id)
+      DO UPDATE SET status = EXCLUDED.status, updated_at = NOW()
+      RETURNING status
+    `,
+    [eventId, userId, status],
+  )
+  // TODO(Grace): sync event conversation membership when status becomes interested/going/withdrawn
+  return result.rows[0]!.status
 }
 
 export async function listParticipants(

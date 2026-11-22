@@ -17,9 +17,10 @@ export interface ConversationRecord {
   createdAt: string
 }
 
-// In-memory fixtures for isolated tests and standalone demos. Normal startup
-// injects PostgresChats for messages and conversations; these maps never serve
-// as a fallback if persistent storage is unavailable.
+// Messages/direct chats are still in memory. In integrated mode the event and
+// member collections are rendering projections of the events API's PostgreSQL
+// records, refreshed by EventChatAccess before every read/send and broadcast.
+// They are not an independent source of event ownership or RSVP permissions.
 export class MemoryChatStore {
   users = new Map<string, ChatMember>()
   events = new Map<string, EventRecord>()

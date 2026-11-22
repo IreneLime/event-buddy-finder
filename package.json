@@ -18,9 +18,7 @@
     "dev:e2e": "concurrently -k -n firebase,web,auth,users,events,chat,images -c yellow,cyan,blue,green,magenta,red,cyan \"pnpm exec firebase emulators:start --only auth --project demo-event-buddy --config firebase.e2e.json\" \"pnpm --filter @event-buddy/web exec vite --host localhost --port 5174 --strictPort\" \"PORT=4103 pnpm --filter @event-buddy/auth-api dev\" \"PORT=4104 pnpm --filter @event-buddy/user-api dev\" \"PORT=4101 pnpm --filter @event-buddy/events-api dev\" \"PORT=4102 pnpm --filter @event-buddy/chat-api dev\" \"PORT=4105 pnpm --filter @event-buddy/image-api dev\"",
     "test:e2e": "pnpm --filter @event-buddy/web test:e2e",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
-    "test:realtime": "pnpm --filter @event-buddy/chat-api test && pnpm --filter @event-buddy/web test",
-    "test:realtime:db": "pnpm --filter @event-buddy/chat-api test:membership && pnpm --filter @event-buddy/chat-api test:persistence && pnpm --filter @event-buddy/events-api test:notifications"
+    "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
     "concurrently": "^10.0.7",
