@@ -30,6 +30,7 @@ export function getObjectStorage(): ObjectStorage {
     bucket: values.bucket!,
     accessKeyId: values.accessKeyId!,
     secretAccessKey: values.secretAccessKey!,
+    forcePathStyle: env.spacesForcePathStyle,
     downloadUrlExpiresInSeconds: env.spacesDownloadUrlExpiresInSeconds,
   })
   return storage

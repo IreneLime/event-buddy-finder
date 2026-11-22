@@ -1,0 +1,93 @@
+services:
+  database:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: event_buddy_finder
+      POSTGRES_USER: event_buddy
+      POSTGRES_PASSWORD: local-demo-only
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U event_buddy -d event_buddy_finder"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    image: postgres:15-alpine
+    working_dir: /workspace
+    command: ["sh", "deploy/local/migrate.sh", "--seed"]
+    environment:
+      DATABASE_URL: postgresql://event_buddy:local-demo-only@database:5432/event_buddy_finder
+    volumes:
+      - ../../database:/workspace/database:ro
+      - .:/workspace/deploy/local:ro
+    depends_on:
+      database:
+        condition: service_healthy
+
+  storage:
+    image: rustfs/rustfs:1.0.0-alpha.91
+    command: ["/data"]
+    environment:
+      RUSTFS_ACCESS_KEY: EVENTBUDDYLOCAL
+      RUSTFS_SECRET_KEY: local-demo-only
+      RUSTFS_ADDRESS: ":19000"
+      RUSTFS_CONSOLE_ENABLE: "false"
+    volumes:
+      - images:/data
+    ports:
+      - "127.0.0.1:5180:5173"
+      - "127.0.0.1:14001-14005:4001-4005"
+      - "127.0.0.1:19099:9099"
+      - "127.0.0.1:19000:19000"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:19000/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/local/Dockerfile
+    # Share loopback so presigned storage URLs use the same host in the
+    # browser and the image API. Only the ports above are published.
+    network_mode: service:storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://event_buddy:local-demo-only@database:5432/event_buddy_finder
+      HOST: 0.0.0.0
+      EVENT_BUDDY_VITE_HOST: 0.0.0.0
+      WEB_ORIGIN: http://127.0.0.1:5180
+      AUTH_API_URL: http://127.0.0.1:4003
+      CHAT_DEV_MODE: "false"
+      CHAT_LOAD_DEMO_HISTORY: "true"
+      FIREBASE_PROJECT_ID: demo-event-buddy-local
+      FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
+      VITE_FIREBASE_API_KEY: local-demo
+      VITE_FIREBASE_AUTH_DOMAIN: localhost
+      VITE_FIREBASE_PROJECT_ID: demo-event-buddy-local
+      VITE_FIREBASE_AUTH_EMULATOR_URL: http://127.0.0.1:19099
+      VITE_EVENTS_API_URL: http://127.0.0.1:14001
+      VITE_CHAT_API_URL: http://127.0.0.1:14002
+      VITE_USERS_API_URL: http://127.0.0.1:14004
+      VITE_IMAGE_API_URL: http://127.0.0.1:14005
+      SPACES_ENDPOINT: http://127.0.0.1:19000
+      SPACES_BUCKET: event-buddy-local
+      SPACES_ACCESS_KEY_ID: EVENTBUDDYLOCAL
+      SPACES_SECRET_ACCESS_KEY: local-demo-only
+      SPACES_FORCE_PATH_STYLE: "true"
+    healthcheck:
+      test: ["CMD", "node", "deploy/local/health.mjs"]
+      interval: 3s
+      timeout: 3s
+      retries: 50
+
+volumes:
+  database:
+  images:
