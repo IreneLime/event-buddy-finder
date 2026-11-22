@@ -61,6 +61,31 @@ it('saves event edits through the backend without shifting time or dropping exis
   }))
 })
 
+it('clears an existing optional end time by sending null to the API', async () => {
+  const { container } = mount(true)
+  await screen.findByDisplayValue(event.title)
+  const endTime = container.querySelectorAll<HTMLInputElement>('input[type="datetime-local"]')[1]
+  expect(endTime.value).not.toBe('')
+  fireEvent.change(endTime, { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+  await screen.findByRole('heading', { name: 'Saved event night-market' })
+  expect(api.update).toHaveBeenCalledWith('night-market', expect.objectContaining({ endsAt: null }))
+})
+
+it('leaves an event without an end time blank during title-only edits', async () => {
+  event = { ...event, endsAt: undefined }
+  const { container } = mount(true)
+  const title = await screen.findByDisplayValue(event.title)
+  const endTime = container.querySelectorAll<HTMLInputElement>('input[type="datetime-local"]')[1]
+  expect(endTime.value).toBe('')
+  fireEvent.change(title, { target: { value: 'Updated without an end time' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+  await screen.findByRole('heading', { name: 'Saved event night-market' })
+  expect(api.update).toHaveBeenCalledWith('night-market', expect.objectContaining({
+    title: 'Updated without an end time', endsAt: null,
+  }))
+})
+
 it('shows a server save error and leaves the edited form available to retry', async () => {
   api.update.mockRejectedValue(new Error('You do not have permission to manage this event'))
   mount(true)

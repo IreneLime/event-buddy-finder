@@ -102,20 +102,21 @@ ALTER TABLE conversations
       AND participant_two_user_id IS NOT NULL AND participant_one_user_id < participant_two_user_id)
   ),
   ADD CONSTRAINT conversations_participant_one_fkey
-    FOREIGN KEY (participant_one_user_id) REFERENCES app_users(firebase_uid) ON DELETE CASCADE,
+    FOREIGN KEY (participant_one_user_id) REFERENCES app_users(firebase_uid) ON DELETE RESTRICT,
   ADD CONSTRAINT conversations_participant_two_fkey
-    FOREIGN KEY (participant_two_user_id) REFERENCES app_users(firebase_uid) ON DELETE CASCADE;
+    FOREIGN KEY (participant_two_user_id) REFERENCES app_users(firebase_uid) ON DELETE RESTRICT;
 CREATE UNIQUE INDEX conversations_direct_pair_idx
   ON conversations(participant_one_user_id, participant_two_user_id) WHERE kind = 'direct';
 
--- Keep message history when a user leaves a conversation. Current access is
--- checked against the event host/RSVP or the conversation's direct pair.
+-- Keep message history when a user leaves a conversation. Physical account
+-- deletion must not erase chat history, so sender references restrict it.
+-- Current access is checked against the event host/RSVP or direct-chat pair.
 ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_conversation_id_sender_user_id_fkey;
 ALTER TABLE messages
   ADD CONSTRAINT messages_conversation_fkey FOREIGN KEY (conversation_id)
     REFERENCES conversations(id) ON DELETE CASCADE,
   ADD CONSTRAINT messages_sender_fkey FOREIGN KEY (sender_user_id)
-    REFERENCES app_users(firebase_uid) ON DELETE CASCADE;
+    REFERENCES app_users(firebase_uid) ON DELETE RESTRICT;
 
 -- Store pending delivery state with the inbox notification itself.
 ALTER TABLE notifications ADD COLUMN published_at TIMESTAMPTZ;

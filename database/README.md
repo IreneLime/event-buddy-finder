@@ -2,6 +2,8 @@
 
 Event Buddy Finder uses PostgreSQL. Migrations `001`–`003` build the original schema; `004_consolidate_schema.sql` migrates it to the six-table schema documented in [database-overview.md](../docs/database-overview.md). Prisma models and generated TypeScript types are maintained alongside these SQL migrations; SQL remains authoritative for PostgreSQL checks and partial indexes.
 
+The database overview documents each consolidated table, its columns and keys, the relationships, the changes from the original 13-table layout, and the main application access paths. The consolidation rationale and tradeoffs are in [database-consolidation.md](../docs/database-consolidation.md).
+
 ## Apply locally
 
 Create a PostgreSQL database, set `DATABASE_URL`, and run the migrations in order:
