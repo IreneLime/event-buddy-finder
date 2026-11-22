@@ -107,13 +107,12 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) process.once(signal, () => 
 try {
   await admin.query(`CREATE DATABASE ${name}`)
   created = true
-  for (const migration of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql']) {
+  for (const migration of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql', '004_consolidate_schema.sql']) {
     await database.query(await readFile(resolve(root, 'database/migrations', migration), 'utf8'))
   }
   await database.query(`INSERT INTO app_users(firebase_uid, email, display_name) VALUES
     ('demo-cathy', 'cathy@example.test', 'Cathy Chen'), ('demo-mina', 'mina@example.test', 'Mina Park'),
     ('demo-alex', 'alex@example.test', 'Alex Rivera'), ('demo-nadia', 'nadia@example.test', 'Nadia Chen')`)
-  await database.query("INSERT INTO categories(name) VALUES ('Music')")
   const events = start('events', ['--import', 'tsx', 'services/events-api/src/index.ts'], root, { PORT: String(portBase + 1) })
   chat = startChat()
   const webRoot = resolve(root, 'apps/web')

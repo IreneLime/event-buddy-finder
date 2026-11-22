@@ -36,7 +36,7 @@ describe('PostgreSQL chat persistence', { skip: !process.env.TEST_DATABASE_URL, 
     url.pathname = `/${name}`
     databaseUrl = url.toString()
     database = new pg.Pool({ connectionString: databaseUrl })
-    for (const migration of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql']) {
+    for (const migration of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql', '004_consolidate_schema.sql']) {
       await database.query(await readFile(new URL(`../../../database/migrations/${migration}`, import.meta.url), 'utf8'))
     }
   })
@@ -189,7 +189,9 @@ describe('PostgreSQL chat persistence', { skip: !process.env.TEST_DATABASE_URL, 
       api('/conversations/direct', index % 2 ? 'alex' : 'cathy', 'POST', { userId: index % 2 ? 'cathy' : 'alex' }, 201)))
     assert.equal(new Set(replies.map((reply) => reply.id)).size, 1)
     assert.equal((await database.query("SELECT COUNT(*)::int AS count FROM conversations WHERE kind = 'direct'")).rows[0].count, 1)
-    assert.equal((await database.query('SELECT COUNT(*)::int AS count FROM conversation_members')).rows[0].count, 2)
+    assert.deepEqual((await database.query<{ participant_one_user_id: string; participant_two_user_id: string }>(
+      "SELECT participant_one_user_id, participant_two_user_id FROM conversations WHERE kind = 'direct'")).rows,
+    [{ participant_one_user_id: 'demo-alex', participant_two_user_id: 'demo-cathy' }])
     await api('/conversations/direct', 'cathy', 'POST', { userId: 'cathy' }, 400)
     await api('/conversations/direct', 'cathy', 'POST', { userId: 'nadia' }, 403)
   })
@@ -237,6 +239,21 @@ describe('PostgreSQL chat persistence', { skip: !process.env.TEST_DATABASE_URL, 
     assert.equal((await api('/ListGroupChats')).items.length, 0)
   })
 
+  test('profile hard deletion is blocked while chat history or a direct chat references the account', async () => {
+    await startServer()
+    const eventChat = await group()
+    await api(`/conversations/${eventChat.id}/messages`, 'cathy', 'POST', { body: 'Keep event history' }, 201)
+    const direct = await api('/conversations/direct', 'cathy', 'POST', { userId: 'alex' }, 201)
+    await api(`/conversations/${direct.id}/messages`, 'alex', 'POST', { body: 'Keep direct history' }, 201)
+
+    await assert.rejects(
+      database.query("DELETE FROM app_users WHERE firebase_uid = 'demo-cathy'"),
+      (error: NodeJS.ErrnoException & { code?: string }) => error.code === '23503',
+    )
+    assert.equal((await database.query("SELECT COUNT(*)::int AS count FROM messages m JOIN app_users u ON u.firebase_uid = m.sender_user_id WHERE u.firebase_uid = 'demo-cathy'")).rows[0].count, 1)
+    assert.equal((await database.query("SELECT COUNT(*)::int AS count FROM messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.kind = 'direct'")).rows[0].count, 1)
+  })
+
   test('a COMMIT failure returns errors and never broadcasts or leaves phantom messages', async () => {
     await startServer()
     const conversation = await group()
@@ -258,7 +275,7 @@ describe('PostgreSQL chat persistence', { skip: !process.env.TEST_DATABASE_URL, 
       await flushed
       assert.deepEqual(observed, [])
       assert.equal((await database.query('SELECT COUNT(*)::int AS count FROM messages')).rows[0].count, 0)
-      assert.equal((await database.query('SELECT COUNT(*)::int AS count FROM conversation_members')).rows[0].count, 0)
+      assert.equal((await database.query("SELECT COUNT(*)::int AS count FROM event_participations WHERE event_id = $1 AND user_id = 'demo-cathy' AND status = 'interested'", [eventId])).rows[0].count, 1)
     } finally {
       await database.query('DROP TRIGGER reject_chat_commit ON messages; DROP FUNCTION reject_chat_commit()')
     }

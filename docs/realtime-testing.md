@@ -53,12 +53,11 @@ connection to wait for earlier packets, avoiding arbitrary sleeps.
 
 ## PostgreSQL chat history
 
-Normal startup uses `PostgresChats` with the existing tables from migrations
-001–003. `MemoryChatStore` remains an isolated unit/demo fixture. No new schema
-migration is needed, and a database failure never falls back to memory.
-The final-submission path keeps `conversation_members` and migrations 001–003;
-see [schema consolidation integration order](../database/README.md#chat-persistence-and-schema-consolidation)
-before combining this adapter with #15.
+Normal startup uses `PostgresChats` with the consolidated tables from migrations
+001–004. `MemoryChatStore` remains an isolated unit/demo fixture. No additional
+schema migration is needed, and a database failure never falls back to memory.
+Direct conversations use the canonical participant pair; event access comes from
+current RSVP records. See [chat schema integration](../database/README.md#chat-persistence-and-schema-consolidation).
 
 `postgres-chats.test.ts` starts the actual `src/index.ts` in a child process,
 sends group/direct messages, checks the database, terminates that process, and

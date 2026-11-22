@@ -13,7 +13,7 @@ and requirement coverage are documented in [real-time regression tests](../../do
 
 Set the same `DATABASE_URL` for the events-api and chat-api implementations
 now available together on main. Notification delivery
-also requires migrations 001–003 described in
+also requires migrations 001–004 described in
 [real-time event notifications](../../docs/realtime-event-notifications.md).
 
 ```sh
@@ -38,8 +38,8 @@ to hard-coded chat fixtures. Production uses the verified Firebase UID directly.
   `going` allow access. The creator has implicit access until an explicit RSVP
   overrides it; an explicit creator withdrawal also revokes access.
 - Chat reads the same `events`, `event_participations`, and `app_users` rows on
-  every history/member read, send, and recipient selection. Historical
-  `conversation_members` rows never grant event access. Changes
+  every history/member read, send, and recipient selection. Stored messages
+  never grant event access. Changes
   take effect on the next operation without waiting for a sync job or reconnect.
 - After a committed withdrawal, REST reads/writes and already connected Socket.IO
   sends are rejected, and subsequent messages are not delivered to that user.
@@ -55,13 +55,13 @@ to hard-coded chat fixtures. Production uses the verified Firebase UID directly.
   re-enrolls a withdrawn user.
 - Restarting chat preserves group/direct conversations, messages, and stable IDs.
   Event chats use `event-<event-id>`; direct chats use `direct-<conversation-id>`.
-- Message inserts and sender membership are committed together before Socket.IO
+- Message inserts are committed before Socket.IO
   delivery or acknowledgement. Storage failures return 503 without a memory
   fallback or a message broadcast. Concurrent reverse DM requests reuse one
   two-person conversation through a transaction-scoped ordered-pair lock.
-- Event withdrawal revokes access without deleting historical membership rows or
-  messages. Otherwise the schema's message foreign key would cascade-delete the
-  former participant's messages. Current RSVP status controls event access.
+- Event withdrawal revokes access without deleting messages. Current RSVP status
+  controls event access; direct participants are stored as a canonical pair on
+  the conversation. The removed `conversation_members` table is not used.
 
 ## API
 
@@ -90,12 +90,11 @@ injects `PostgresChats` and `PostgresEventMembership`, including in development.
 Production startup requires an identity verifier, an authoritative membership
 source, and persistent chat storage. `/health` reports `storage: postgresql`.
 
-No new migration is required for chat persistence: migrations 001–003 already
-provide the conversation, membership, and message tables used by this adapter.
+No additional migration is required for chat persistence: migrations 001–004
+provide the consolidated conversation and message tables used by this adapter.
 Existing database-seeded group/direct chats and their messages remain readable.
-Keep this schema for the final-submission persistence integration; the separate
-six-table proposal removes `conversation_members` and requires adapting and
-retesting chat before combining it. See [schema integration order](../../database/README.md#chat-persistence-and-schema-consolidation).
+This adapter is compatible with the six-table consolidation already merged in
+#15. See [chat schema integration](../../database/README.md#chat-persistence-and-schema-consolidation).
 Messages previously held only in an old server's memory cannot be recovered
 after that server has stopped.
 
@@ -279,7 +278,7 @@ pnpm --filter @event-buddy/chat-api typecheck
 ```
 
 The database regression runs the actual merged events API with real HTTP and
-Socket.IO requests, using migrations 001–003 in a disposable database:
+Socket.IO requests, using migrations 001–004 in a disposable database:
 
 ```sh
 TEST_DATABASE_URL="$DATABASE_URL" pnpm --filter @event-buddy/chat-api test:membership

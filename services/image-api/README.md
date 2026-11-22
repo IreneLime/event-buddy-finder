@@ -15,8 +15,8 @@ Protected routes forward the Bearer token to `AUTH_API_URL/api/auth/session`, so
 | `POST` | `/me/profile/image` | Verified user | Upload or replace the current profile image |
 | `DELETE` | `/me/profile/image` | Verified user | Remove the current profile image |
 | `GET` | `/events/:id/image` | Public | Return a temporary signed event-image URL |
-| `POST` | `/events/:id/image` | Event owner or group organizer | Upload or replace an event image |
-| `DELETE` | `/events/:id/image` | Event owner or group organizer | Remove an event image |
+| `POST` | `/events/:id/image` | Event owner | Upload or replace an event image |
+| `DELETE` | `/events/:id/image` | Event owner | Remove an event image |
 
 Uploads use multipart form data with field name `image`. JPEG, PNG, and WebP files up to 5 MB are accepted. File contents are detected from their bytes rather than trusting the submitted filename or MIME header.
 

@@ -28,7 +28,7 @@ Guests and unverified signed-in users may browse public profiles and event histo
 
 ## Local development
 
-Apply `database/migrations/001_initial_schema.sql`, configure `.env`, start `auth-api` on port 4003, then run:
+Apply migrations 001–004 from the repository database guide, configure `.env`, start `auth-api` on port 4003, then run:
 
 ```sh
 pnpm --filter @event-buddy/user-api dev

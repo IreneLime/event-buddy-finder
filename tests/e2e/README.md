@@ -10,8 +10,8 @@ TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres pnpm te
 
 `TEST_DATABASE_URL` identifies a local PostgreSQL server where the test user can
 create databases. The stack creates a uniquely named `chat_browser_*` database,
-applies migrations 001–003, and adds four fictional development profiles and a
-category. Each journey creates a new event through the actual events API and
+applies migrations 001–004, and adds four fictional development profiles.
+Each journey creates a new event through the actual events API and
 writes RSVP through the browser. The stack drops only its own database on exit;
 no existing application's database is seeded, truncated, or migrated.
 

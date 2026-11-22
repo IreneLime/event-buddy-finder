@@ -1,24 +1,22 @@
 -- Fictional local development fixtures only. These Firebase UIDs are placeholders;
 -- they are not accounts in Firebase and must never be used as production identities.
+BEGIN;
 
-INSERT INTO app_users (firebase_uid, email, display_name, age_range, affiliation, bio, profile_completed_at)
+INSERT INTO app_users (firebase_uid, email, display_name, age_range, affiliation, bio, preferred_categories, profile_completed_at)
 VALUES
-  ('demo-cathy', 'cathy@example.test', 'Cathy Chen', '18_24', 'University of Toronto · ECE', 'Always up for a new café, live music, or a creative afternoon. Currently learning pottery.', NOW()),
-  ('demo-mina', 'mina@example.test', 'Mina Park', '25_34', 'University of Toronto · Architecture', 'Weekend market wanderer and enthusiastic dumpling recommender. Happy to meet new neighbours.', NOW()),
-  ('demo-alex', 'alex@example.test', 'Alex Rivera', '25_34', 'Toronto Arts Community', 'Board games, park walks, and discovering small live-music venues.', NOW()),
-  ('demo-nadia', 'nadia@example.test', 'Nadia Chen', '18_24', 'Markham Community Arts Council', 'I like flower markets, dance workshops, and taking far too many photos.', NOW())
+  ('demo-cathy', 'cathy@example.test', 'Cathy Chen', '18_24', 'University of Toronto · ECE', 'Always up for a new café, live music, or a creative afternoon. Currently learning pottery.', ARRAY['Arts','Food','Music']::text[], NOW()),
+  ('demo-mina', 'mina@example.test', 'Mina Park', '25_34', 'University of Toronto · Architecture', 'Weekend market wanderer and enthusiastic dumpling recommender. Happy to meet new neighbours.', ARRAY['Food','Community','Arts']::text[], NOW()),
+  ('demo-alex', 'alex@example.test', 'Alex Rivera', '25_34', 'Toronto Arts Community', 'Board games, park walks, and discovering small live-music venues.', ARRAY['Games','Outdoors','Music']::text[], NOW()),
+  ('demo-nadia', 'nadia@example.test', 'Nadia Chen', '18_24', 'Markham Community Arts Council', 'I like flower markets, dance workshops, and taking far too many photos.', ARRAY['Arts','Markets','Dance']::text[], NOW())
 ON CONFLICT (firebase_uid) DO UPDATE SET
   email = EXCLUDED.email,
   display_name = EXCLUDED.display_name,
   age_range = EXCLUDED.age_range,
   affiliation = EXCLUDED.affiliation,
   bio = EXCLUDED.bio,
+  preferred_categories = EXCLUDED.preferred_categories,
   profile_completed_at = EXCLUDED.profile_completed_at,
   updated_at = NOW();
-
-INSERT INTO categories (name) VALUES
-  ('Arts'), ('Community'), ('Dance'), ('Food'), ('Games'), ('Markets'), ('Music'), ('Outdoors'), ('Social'), ('Wellness')
-ON CONFLICT (name) DO NOTHING;
 
 -- Fixed sample event dates make the seed reproducible for the Fall 2026 demo.
 INSERT INTO events (
@@ -51,17 +49,14 @@ FROM (VALUES
 ) AS seed(public_id, title, owner)
 WHERE event.title = seed.title AND event.created_by_user_id = seed.owner AND event.public_id IS NULL;
 
-INSERT INTO event_categories (event_id, category_id)
-SELECT event.id, category.id
+UPDATE events event SET category_names = seed.category_names
 FROM (VALUES
-  ('Lanterns & Late Bites', 'Food'), ('Lanterns & Late Bites', 'Community'),
-  ('Saturday Flower Market & Coffee', 'Markets'), ('Saturday Flower Market & Coffee', 'Community'),
-  ('Beginner Salsa Social', 'Dance'), ('Beginner Salsa Social', 'Wellness'),
-  ('Lakeside Walk & Hot Chocolate', 'Outdoors'), ('Lakeside Walk & Hot Chocolate', 'Social')
-) AS seed(event_title, category_name)
-JOIN events event ON event.title = seed.event_title
-JOIN categories category ON category.name = seed.category_name
-ON CONFLICT (event_id, category_id) DO NOTHING;
+  ('Lanterns & Late Bites', ARRAY['Food','Community']::text[]),
+  ('Saturday Flower Market & Coffee', ARRAY['Markets','Community']::text[]),
+  ('Beginner Salsa Social', ARRAY['Dance','Wellness']::text[]),
+  ('Lakeside Walk & Hot Chocolate', ARRAY['Outdoors','Social']::text[])
+) AS seed(title, category_names)
+WHERE event.title = seed.title;
 
 INSERT INTO event_participations (event_id, user_id, status)
 SELECT event.id, seed.user_id, seed.status
@@ -80,49 +75,15 @@ FROM events event
 WHERE event.title IN ('Lanterns & Late Bites', 'Saturday Flower Market & Coffee', 'Beginner Salsa Social', 'Lakeside Walk & Hot Chocolate')
 ON CONFLICT (event_id) WHERE kind = 'event' DO NOTHING;
 
-INSERT INTO conversation_members (conversation_id, user_id)
-SELECT conversation.id, member.firebase_uid
-FROM conversations conversation
-JOIN events event ON event.id = conversation.event_id
-JOIN app_users member ON member.firebase_uid = event.created_by_user_id
-WHERE conversation.kind = 'event'
-  AND event.title IN ('Lanterns & Late Bites', 'Saturday Flower Market & Coffee', 'Beginner Salsa Social', 'Lakeside Walk & Hot Chocolate')
-ON CONFLICT (conversation_id, user_id) DO NOTHING;
-
-INSERT INTO conversation_members (conversation_id, user_id)
-SELECT conversation.id, participation.user_id
-FROM conversations conversation
-JOIN event_participations participation ON participation.event_id = conversation.event_id
-JOIN events event ON event.id = conversation.event_id
-WHERE conversation.kind = 'event'
-  AND event.title IN ('Lanterns & Late Bites', 'Saturday Flower Market & Coffee', 'Beginner Salsa Social', 'Lakeside Walk & Hot Chocolate')
-  AND participation.status IN ('interested', 'going')
-ON CONFLICT (conversation_id, user_id) DO NOTHING;
-
 -- A small direct conversation for testing profile-to-chat navigation.
-WITH matching_conversation AS (
-  SELECT conversation.id
-  FROM conversations conversation
-  WHERE conversation.kind = 'direct'
-    AND (SELECT COUNT(*) FROM conversation_members member WHERE member.conversation_id = conversation.id) = 2
-    AND EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversation_id = conversation.id AND member.user_id = 'demo-cathy')
-    AND EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversation_id = conversation.id AND member.user_id = 'demo-mina')
-), inserted_conversation AS (
-  INSERT INTO conversations (kind)
-  SELECT 'direct'
-  WHERE NOT EXISTS (SELECT 1 FROM matching_conversation)
-  RETURNING id
-), target_conversation AS (
-  SELECT id FROM matching_conversation
-  UNION ALL
-  SELECT id FROM inserted_conversation
-)
-INSERT INTO conversation_members (conversation_id, user_id)
-SELECT target.id, member.firebase_uid
-FROM target_conversation target
-CROSS JOIN app_users member
-WHERE member.firebase_uid IN ('demo-cathy', 'demo-mina')
-ON CONFLICT (conversation_id, user_id) DO NOTHING;
+INSERT INTO conversations (kind, participant_one_user_id, participant_two_user_id)
+SELECT 'direct', 'demo-cathy', 'demo-mina'
+WHERE NOT EXISTS (
+  SELECT 1 FROM conversations
+  WHERE kind = 'direct'
+    AND participant_one_user_id = 'demo-cathy'
+    AND participant_two_user_id = 'demo-mina'
+);
 
 INSERT INTO messages (conversation_id, sender_user_id, body, created_at)
 SELECT conversation.id, seed.sender_id, seed.body, seed.created_at
@@ -136,7 +97,11 @@ FROM (VALUES
 ) AS seed(event_title, sender_id, body, created_at)
 JOIN events event ON event.title = seed.event_title
 JOIN conversations conversation ON conversation.event_id = event.id AND conversation.kind = 'event'
-WHERE EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversation_id = conversation.id AND member.user_id = seed.sender_id)
+WHERE (event.created_by_user_id = seed.sender_id OR EXISTS (
+    SELECT 1 FROM event_participations member
+    WHERE member.event_id = event.id AND member.user_id = seed.sender_id
+      AND member.status IN ('interested', 'going')
+  ))
   AND NOT EXISTS (SELECT 1 FROM messages existing WHERE existing.conversation_id = conversation.id AND existing.sender_user_id = seed.sender_id AND existing.body = seed.body);
 
 INSERT INTO messages (conversation_id, sender_user_id, body, created_at)
@@ -146,8 +111,8 @@ FROM (VALUES
   ('demo-mina', 'That sounds perfect. I know a coffee place nearby too.', '2026-11-10 16:11:00-05'::timestamptz)
 ) AS seed(sender_id, body, created_at)
 JOIN conversations conversation ON conversation.kind = 'direct'
-  AND (SELECT COUNT(*) FROM conversation_members participant WHERE participant.conversation_id = conversation.id) = 2
-WHERE EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversation_id = conversation.id AND member.user_id = seed.sender_id)
-  AND EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversation_id = conversation.id AND member.user_id = 'demo-cathy')
-  AND EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversation_id = conversation.id AND member.user_id = 'demo-mina')
+  AND conversation.participant_one_user_id = 'demo-cathy'
+  AND conversation.participant_two_user_id = 'demo-mina'
   AND NOT EXISTS (SELECT 1 FROM messages existing WHERE existing.conversation_id = conversation.id AND existing.sender_user_id = seed.sender_id AND existing.body = seed.body);
+
+COMMIT;
