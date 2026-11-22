@@ -4,7 +4,7 @@
 
 ## Project Introduction
 
-Event Buddy Finder is a social event-discovery platform for people across the Greater Toronto Area who want to explore local events and connect with others who share their interests. Individuals can browse a shared calendar of events grouped by category, location, attendance, and other details. Users can track events they are interested in, join event-specific group chats, and directly message people with similar interests. Registered groups can publish and update event listings. By combining event discovery with social interaction, Event Buddy Finder helps users make informed plans and find companions before attending an event.
+Event Buddy Finder is a social event-discovery platform for people across the Greater Toronto Area who want to explore local events and connect with others who share their interests. Individuals can browse a shared calendar of events grouped by category, location, attendance, and other details. Users can track events they are interested in, join event-specific group chats, and directly message people with similar interests. Individual users can publish and update event listings. Group-organized events are deferred from the initial scope so the team can focus on the core event and chat workflows.
 
 ## 1. Motivation
 
@@ -15,7 +15,7 @@ Many people who want to explore local events may not want to attend alone, may h
 ### 1.2 Target Users
 
 - **Attendees:** Greater Toronto Area residents who want to try local events but prefer not to attend alone.
-- **Organizers:** Individuals and registered groups who post and manage event listings.
+- **Organizers:** Individual users who post and manage event listings.
 
 ### 1.3 Limitations of Existing Approaches
 
@@ -41,11 +41,11 @@ The objective of this project is to develop a web application that combines even
 - User authentication and profiles
 - Event discovery with calendar, search, and filters
 - Event management
-- Event participation with organizer approval
+- Event participation with interested and going statuses
 - Real-time group chats and direct messaging
 - Real-time event notifications
 
-Waitlists, personalized event recommendations, automated companion matching, and payment processing will remain outside the initial scope.
+Group profiles and group-managed events, waitlists, personalized event recommendations, automated companion matching, and payment processing will remain outside the initial scope.
 
 ### 2.3 Feasibility
 
@@ -70,12 +70,12 @@ Event Buddy Finder will use the course's **Option B (separate frontend and backe
 #### Frontend
 
 - **Stack:** React and TypeScript, styled with Tailwind CSS and shadcn/ui.
-- **Interface:** A responsive calendar and event list with date, category, and location filters. Event pages show details, a static location map, an "Interested" option, a "Request to Join" action, and event chat. The "Going" status appears after organizer approval.
+- **Interface:** A responsive calendar and event list with date, category, and location filters. Event pages show details, a location map, options to mark interest or going, and event chat. Users choose their own participation status; the event organizer does not approve attendance.
 
 #### Backend Services
 
 - **Services:** Both services will use a shared PostgreSQL deployment to maintain consistency across related records. This simplifies cross-service data access but couples the services through a shared schema.
-- **Statuses:** Events will have a `scheduled` or `cancelled` status. A separate user–event participation record will track `interested`, `pending_approval`, `going`, `declined`, or `cancelled`.
+- **Statuses:** Events have a `scheduled` or `cancelled` status. A separate user–event participation record tracks a user's interest or attendance independently from the event status.
 
 ![Participation status lifecycle](https://raw.githubusercontent.com/IreneLime/event-buddy-finder/main/images/participation-status.png)
 
@@ -83,7 +83,7 @@ Event Buddy Finder will use the course's **Option B (separate frontend and backe
 
 #### Database and File Storage
 
-- **PostgreSQL:** The database stores users and profiles, groups, group memberships, events, event participation, chat messages, and notifications. Each event records its creator and, when posted on behalf of a group, the organizing group; messages and notifications link back to the relevant users and events.
+- **PostgreSQL:** The consolidated schema uses six tables: `app_users`, `events`, `event_participations`, `conversations`, `messages`, and `notifications`. User and event category names are stored as validated arrays. Foreign keys connect creators, participants, messages, and notifications to related records. Group profiles and group-owned events are deferred from the first release.
 - **Cloud storage:** The backend uploads profile pictures and event images to a DigitalOcean Spaces bucket and saves each object key or URL in the related PostgreSQL record. Spaces is the object-storage service used as an example in the course and has an S3-compatible API.
 
 #### Design Rationale: Alternatives, Tradeoffs, Risks, and Assumptions
@@ -112,7 +112,7 @@ Firebase Authentication will manage user identity and authentication sessions, w
 
 Each event will have a dedicated group chat where participants can ask questions and coordinate attendance, and users can directly message others who are interested in attending. When a user sends a message, the server will verify their chat permissions, save the message in PostgreSQL, and broadcast it to authorized participants without a page refresh; previous conversations will remain available when users return.
 
-When an event changes or is cancelled, the backend will save an alert for interested users and people whose join requests are pending or approved. Socket.IO will deliver it to online users, and the app will keep it for those who reconnect later, showing an in-app alert with an optional browser notification.
+When an event changes or is cancelled, the backend will save an alert for users marked interested or going. Socket.IO will deliver it to online users, and the app will keep it for those who reconnect later, showing an in-app alert with an optional browser notification.
 
 ## 3. Project Plan and Team Responsibilities
 

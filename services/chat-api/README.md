@@ -9,7 +9,7 @@ Firebase sessions are verified through the auth API. Demo identity headers are d
 
 Set the same `DATABASE_URL` for the events-api and chat-api implementations
 now available together on main. Notification delivery
-also requires migrations 001–003 described in
+also requires migrations 001–004 described in
 [real-time event notifications](../../docs/realtime-event-notifications.md).
 
 ```sh
@@ -89,7 +89,7 @@ pnpm --filter @event-buddy/chat-api typecheck
 ```
 
 The database regression runs the actual merged events API with real HTTP and
-Socket.IO requests, using migrations 001–003 in a disposable database:
+Socket.IO requests, using migrations 001–004 in a disposable database:
 
 ```sh
 TEST_DATABASE_URL="$DATABASE_URL" pnpm --filter @event-buddy/chat-api test:membership

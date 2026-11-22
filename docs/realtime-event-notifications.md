@@ -16,12 +16,12 @@ Demo: sign in as Mina in one browser profile and Cathy in another. Edit `/events
 
 ## Persistence and delivery
 
-- Migration `003_realtime_event_notifications.sql` installs an event-update trigger. Event changes, recipient alerts, and delivery-outbox rows commit or roll back together.
+- Migrations `003_realtime_event_notifications.sql` and `004_consolidate_schema.sql` install the event-update trigger and store delivery state in `notifications.published_at`. Event changes, recipient alerts, and delivery state commit or roll back together.
 - Recipients have participation `interested`, `pending_approval`, or `going`. The actor, withdrawn users, declined users, and unrelated users are excluded. Schema support for pending/declined states is present; organizer approval endpoints remain separate work. Current self-service endpoints accept interested/going/withdrawn.
 - Alerts identify date/time, location, title, details, attendance details, and category changes. An unchanged save creates no alert. Cancellation creates a cancellation alert.
 - events-api sets the trusted actor inside the transaction. Recipients come from the database, not a client-provided list.
-- chat-api uses PostgreSQL `LISTEN/NOTIFY` to wake an outbox publisher, with a one-second recovery poll for missed signals and outages. Online delivery goes to authenticated per-user Socket.IO rooms. Inbox rows remain available after delivery, reconnects, and service restarts.
-- Publication is at least once: a crash between emission and the outbox commit can repeat an event. The frontend deduplicates by notification ID. This prototype runs one notification publisher; multiple chat replicas require fan-out coordination before deployment.
+- chat-api uses PostgreSQL `LISTEN/NOTIFY` to wake a notification publisher, with a one-second recovery poll for missed signals and outages. Online delivery goes to authenticated per-user Socket.IO rooms. Inbox rows remain available after delivery, reconnects, and service restarts.
+- Publication is at least once: a crash between emission and updating `published_at` can repeat an event. The frontend deduplicates by notification ID. This prototype runs one notification publisher; multiple chat replicas require fan-out coordination before deployment.
 - Mark-read operations are scoped to the authenticated recipient. Changes are broadcast to that user's other connected tabs.
 - Event chat membership reads the same PostgreSQL event/RSVP records owned by events-api; new events resolve a chat automatically and withdrawal revokes reads, sends, and future delivery. See [chat membership and its integration regression](../services/chat-api/README.md).
 - The event frontend now reads and saves server records. Stable public IDs preserve seeded event links; generated events use their database ID. Chat messages continue to use the existing memory adapter; notification persistence is independent of chat history.
@@ -35,12 +35,14 @@ export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/event_buddy_fi
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/001_initial_schema.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/002_event_city_and_notes.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/003_realtime_event_notifications.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/004_consolidate_schema.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/seeds/001_demo_data.sql
+pnpm --filter @event-buddy/database db:generate
 pnpm install
 pnpm dev
 ```
 
-For an existing database already at migration 002, apply only migration 003; do not rerun the initial schema. Set the same `DATABASE_URL` for events-api and chat-api. Development login IDs such as `cathy` map explicitly to seeded database UIDs such as `demo-cathy`; production uses verified Firebase UIDs without that mapping. Production still requires the existing Firebase verifier/token-provider integration.
+For an existing database, apply only the migrations it has not yet received, in order; do not rerun the initial schema. Migration 004 preflights data it cannot represent and must not be forced past those checks. Set the same `DATABASE_URL` for events-api and chat-api. Development login IDs such as `cathy` map explicitly to seeded database UIDs such as `demo-cathy`; production uses verified Firebase UIDs without that mapping. Production still requires the existing Firebase verifier/token-provider integration.
 
 The page is at `http://localhost:5173/notifications`. Email delivery is outside this proposal's event-alert flow.
 

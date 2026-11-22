@@ -39,7 +39,7 @@ describe('persistent real-time event notifications', { skip: !process.env.TEST_D
     process.env.NODE_ENV = 'test'
     delete process.env.FIREBASE_PROJECT_ID
     database = new pg.Pool({ connectionString: databaseUrl })
-    for (const file of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql']) {
+    for (const file of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql', '004_consolidate_schema.sql']) {
       await database.query(await readFile(new URL(`../../../database/migrations/${file}`, import.meta.url), 'utf8'))
     }
     await database.query(await readFile(new URL('../../../database/seeds/001_demo_data.sql', import.meta.url), 'utf8'))
@@ -164,7 +164,7 @@ describe('persistent real-time event notifications', { skip: !process.env.TEST_D
   test('outbox recovery and unread/read state survive a chat service restart', async () => {
     await chat.close()
     await eventApi(`/events/${eventId}`, 'PATCH', { notes: 'Changed while the notification service was offline.' })
-    const pending = await database.query('SELECT COUNT(*)::int AS count FROM notification_outbox WHERE published_at IS NULL')
+    const pending = await database.query('SELECT COUNT(*)::int AS count FROM notifications WHERE published_at IS NULL AND event_id IS NOT NULL')
     assert.equal(pending.rows[0].count, 3)
     await startChat()
     const saved = await inbox()

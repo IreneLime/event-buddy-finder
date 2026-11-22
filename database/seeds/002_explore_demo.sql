@@ -1,4 +1,4 @@
--- Development fixtures. Run after 001_demo_data.sql and migrations 001–003.
+-- Development fixtures. Run after 001_demo_data.sql and migrations 001–004.
 BEGIN;
 
 INSERT INTO app_users (firebase_uid, email, display_name, bio, profile_completed_at)
@@ -75,12 +75,11 @@ WHERE event.public_id = seed.public_id
   AND seed.days < 0
   AND COALESCE(event.ends_at, event.starts_at) >= NOW();
 
-INSERT INTO event_categories (event_id, category_id)
-SELECT event.id, category.id
+UPDATE events event
+SET category_names = ARRAY[seed.category]::text[]
 FROM explore_demo_events seed
-JOIN events event USING (public_id)
-JOIN categories category ON category.name = seed.category
-ON CONFLICT DO NOTHING;
+WHERE event.public_id = seed.public_id
+  AND event.created_by_user_id = seed.owner_id;
 
 -- Seed attendance history and upcoming interests without replacing existing RSVPs.
 INSERT INTO event_participations (event_id, user_id, status)
@@ -115,13 +114,6 @@ ON CONFLICT DO NOTHING;
 INSERT INTO conversations (kind, event_id)
 SELECT 'event', id FROM events WHERE public_id = 'riverside-photo-walk'
 ON CONFLICT (event_id) WHERE kind = 'event' DO NOTHING;
-
-INSERT INTO conversation_members (conversation_id, user_id)
-SELECT c.id, seed.user_id
-FROM conversations c JOIN events e ON c.event_id = e.id
-CROSS JOIN (VALUES ('demo-cathy'), ('demo-maya')) AS seed(user_id)
-WHERE e.public_id = 'riverside-photo-walk'
-ON CONFLICT DO NOTHING;
 
 INSERT INTO messages (conversation_id, sender_user_id, body, created_at)
 SELECT c.id, seed.sender_id, seed.body, LEAST(e.starts_at, NOW()) - seed.lead

@@ -1,3 +1,18 @@
+export const EVENT_CATEGORIES = [
+  { id: 'arts', name: 'Arts' },
+  { id: 'community', name: 'Community' },
+  { id: 'dance', name: 'Dance' },
+  { id: 'food', name: 'Food' },
+  { id: 'games', name: 'Games' },
+  { id: 'markets', name: 'Markets' },
+  { id: 'music', name: 'Music' },
+  { id: 'outdoors', name: 'Outdoors' },
+  { id: 'social', name: 'Social' },
+  { id: 'wellness', name: 'Wellness' },
+] as const
+
+export const EVENT_CATEGORY_NAMES = EVENT_CATEGORIES.map(({ name }) => name)
+
 export type EventStatus = 'scheduled' | 'cancelled'
 
 export type ParticipationStatus = 'interested' | 'pending_approval' | 'going' | 'declined' | 'withdrawn'
@@ -48,7 +63,6 @@ export interface CreateEventRequest {
   capacity?: number
   notes?: string
   categoryNames: string[]
-  organizingGroupId?: string
   imageObjectKey?: string
 }
 
@@ -66,7 +80,6 @@ export interface UpdateEventRequest {
   capacity?: number | null
   notes?: string | null
   categoryNames?: string[]
-  organizingGroupId?: string | null
   imageObjectKey?: string | null
 }
 

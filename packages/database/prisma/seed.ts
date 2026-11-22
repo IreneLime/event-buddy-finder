@@ -1,13 +1,11 @@
 import { prisma } from '../src/client.js'
 
 const users = [
-  { firebaseUid: 'demo-cathy', email: 'cathy@example.test', displayName: 'Cathy Chen', ageRange: '18_24', affiliation: 'University of Toronto · ECE', bio: 'Always up for a new café, live music, or a creative afternoon. Currently learning pottery.' },
-  { firebaseUid: 'demo-mina', email: 'mina@example.test', displayName: 'Mina Park', ageRange: '25_34', affiliation: 'University of Toronto · Architecture', bio: 'Weekend market wanderer and enthusiastic dumpling recommender. Happy to meet new neighbours.' },
-  { firebaseUid: 'demo-alex', email: 'alex@example.test', displayName: 'Alex Rivera', ageRange: '25_34', affiliation: 'Toronto Arts Community', bio: 'Board games, park walks, and discovering small live-music venues.' },
-  { firebaseUid: 'demo-nadia', email: 'nadia@example.test', displayName: 'Nadia Chen', ageRange: '18_24', affiliation: 'Markham Community Arts Council', bio: 'I like flower markets, dance workshops, and taking far too many photos.' },
+  { firebaseUid: 'demo-cathy', email: 'cathy@example.test', displayName: 'Cathy Chen', ageRange: '18_24', affiliation: 'University of Toronto · ECE', bio: 'Always up for a new café, live music, or a creative afternoon. Currently learning pottery.', preferredCategories: ['Arts', 'Food', 'Music'] },
+  { firebaseUid: 'demo-mina', email: 'mina@example.test', displayName: 'Mina Park', ageRange: '25_34', affiliation: 'University of Toronto · Architecture', bio: 'Weekend market wanderer and enthusiastic dumpling recommender. Happy to meet new neighbours.', preferredCategories: ['Food', 'Community', 'Arts'] },
+  { firebaseUid: 'demo-alex', email: 'alex@example.test', displayName: 'Alex Rivera', ageRange: '25_34', affiliation: 'Toronto Arts Community', bio: 'Board games, park walks, and discovering small live-music venues.', preferredCategories: ['Games', 'Outdoors', 'Music'] },
+  { firebaseUid: 'demo-nadia', email: 'nadia@example.test', displayName: 'Nadia Chen', ageRange: '18_24', affiliation: 'Markham Community Arts Council', bio: 'I like flower markets, dance workshops, and taking far too many photos.', preferredCategories: ['Arts', 'Markets', 'Dance'] },
 ]
-
-const categoryNames = ['Arts', 'Community', 'Dance', 'Food', 'Games', 'Markets', 'Music', 'Outdoors', 'Social', 'Wellness']
 
 const events = [
   { key: 'night-market', owner: 'demo-mina', title: 'Lanterns & Late Bites', description: 'Spend a relaxed Sunday evening exploring the food stalls and local makers at Stackt Market. We will try a few snacks, share recommendations, and leave room for dessert. Come solo or bring a friend; the group will meet at the main entrance before wandering together.', notes: 'Meet beside the Bathurst Street entrance at 6:20 PM. The market is mostly outdoors, so bring a warm layer. Food is pay-as-you-go, with vegetarian options. Message the chat if you are running late.', startsAt: '2026-11-15T18:30:00-05:00', endsAt: '2026-11-15T21:30:00-05:00', venue: 'Stackt Market', city: 'Toronto', address: '28 Bathurst St, Toronto, ON', latitude: 43.6394, longitude: -79.4022, price: '0.00', categories: ['Food', 'Community'], participants: [['demo-cathy', 'interested'], ['demo-alex', 'going'], ['demo-mina', 'going']] as const },
@@ -23,10 +21,6 @@ async function main() {
       create: { ...user, profileCompletedAt: new Date('2026-10-20T12:00:00Z') },
       update: user,
     })
-  }
-
-  for (const name of categoryNames) {
-    await prisma.category.upsert({ where: { name }, create: { name }, update: {} })
   }
 
   for (const data of events) {
@@ -47,6 +41,7 @@ async function main() {
           latitude: data.latitude,
           longitude: data.longitude,
           priceAmount: data.price,
+          categoryNames: [...data.categories],
         },
       })
       : await prisma.event.create({
@@ -64,18 +59,9 @@ async function main() {
           latitude: data.latitude,
           longitude: data.longitude,
           priceAmount: data.price,
-          categories: { create: data.categories.map((name) => ({ category: { connect: { name } } })) },
+          categoryNames: [...data.categories],
         },
       })
-
-    if (existing) {
-      await prisma.eventCategory.deleteMany({ where: { eventId: event.id } })
-      const categories = await prisma.category.findMany({ where: { name: { in: data.categories } }, select: { id: true } })
-      await prisma.eventCategory.createMany({
-        data: categories.map((category) => ({ eventId: event.id, categoryId: category.id })),
-        skipDuplicates: true,
-      })
-    }
 
     for (const [userId, status] of data.participants) {
       await prisma.eventParticipation.upsert({
@@ -90,15 +76,6 @@ async function main() {
       create: { kind: 'event', eventId: event.id },
       update: {},
     })
-    const memberIds = new Set([data.owner, ...data.participants.map(([userId]) => userId)])
-    for (const userId of memberIds) {
-      await prisma.conversationMember.upsert({
-        where: { conversationId_userId: { conversationId: conversation.id, userId } },
-        create: { conversationId: conversation.id, userId },
-        update: {},
-      })
-    }
-
     const exampleMessage = data.key === 'night-market'
       ? { sender: 'demo-mina', body: 'I’ll be by the main entrance at 6:20. Message here if you get turned around.' }
       : data.key === 'flower-market'
@@ -120,16 +97,11 @@ async function main() {
   }
 
   const cathyMinaConversation = await prisma.conversation.findFirst({
-    where: { kind: 'direct', members: { some: { userId: 'demo-cathy' } } },
+    where: { kind: 'direct', participantOneUserId: 'demo-cathy', participantTwoUserId: 'demo-mina' },
   })
-  const direct = cathyMinaConversation ?? await prisma.conversation.create({ data: { kind: 'direct' } })
-  for (const userId of ['demo-cathy', 'demo-mina']) {
-    await prisma.conversationMember.upsert({
-      where: { conversationId_userId: { conversationId: direct.id, userId } },
-      create: { conversationId: direct.id, userId },
-      update: {},
-    })
-  }
+  const direct = cathyMinaConversation ?? await prisma.conversation.create({
+    data: { kind: 'direct', participantOneUserId: 'demo-cathy', participantTwoUserId: 'demo-mina' },
+  })
 
   for (const message of [
     { senderUserId: 'demo-cathy', body: 'Want to check out the flower market before the afternoon concert?' },

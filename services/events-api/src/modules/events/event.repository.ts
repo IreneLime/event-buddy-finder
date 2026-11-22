@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg'
+import { EVENT_CATEGORIES, EVENT_CATEGORY_NAMES } from '@event-buddy/contracts'
 
 import { pool } from '../../db/pool.js'
 import { ApiError } from '../../utils/ApiError.js'
@@ -30,12 +30,7 @@ const EVENT_SELECT = `
       FROM event_participations ep
       WHERE ep.event_id = e.id AND ep.status IN ('interested', 'going')
     ), 0) AS participant_count,
-    COALESCE((
-      SELECT array_agg(c.name ORDER BY c.name)
-      FROM event_categories ec
-      JOIN categories c ON c.id = ec.category_id
-      WHERE ec.event_id = e.id
-    ), '{}') AS category_names,
+    e.category_names,
     viewer.status AS viewer_participation
   FROM events e
   JOIN app_users u ON u.firebase_uid = e.created_by_user_id
@@ -52,7 +47,6 @@ const SORT_COLUMNS = {
 export interface EventOwnershipRow {
   id: string
   created_by_user_id: string
-  organizing_group_id: string | null
   status: 'scheduled' | 'cancelled'
   starts_at: Date
   ends_at: Date | null
@@ -120,7 +114,7 @@ export async function getEventById(
 export async function getEventOwnership(eventId: string): Promise<EventOwnershipRow | undefined> {
   const result = await pool.query<EventOwnershipRow>(
     `
-      SELECT id::text, created_by_user_id, organizing_group_id::text, status, starts_at, ends_at, capacity
+      SELECT id::text, created_by_user_id, status, starts_at, ends_at, capacity
       FROM events
       WHERE id::text = $1 OR public_id = $1
     `,
@@ -137,49 +131,11 @@ export async function userExists(userId: string): Promise<boolean> {
   return Boolean(result.rows[0]?.exists)
 }
 
-export async function isGroupOrganizer(groupId: string, userId: string): Promise<boolean> {
-  const result = await pool.query<{ exists: boolean }>(
-    `
-      SELECT EXISTS(
-        SELECT 1 FROM group_members
-        WHERE group_id = $1 AND user_id = $2 AND role = 'organizer'
-      ) AS exists
-    `,
-    [groupId, userId],
-  )
-  return Boolean(result.rows[0]?.exists)
-}
-
-async function resolveCategoryIds(client: PoolClient, categoryNames: string[]): Promise<number[]> {
-  if (categoryNames.length === 0) {
-    return []
-  }
-
-  const result = await client.query<{ id: string; name: string }>(
-    `SELECT id::text, name FROM categories WHERE name = ANY($1::text[])`,
-    [categoryNames],
-  )
-
-  const found = new Map(result.rows.map((row) => [row.name, Number(row.id)]))
-  const missing = categoryNames.filter((name) => !found.has(name))
+function validateCategoryNames(categoryNames: string[]): void {
+  const allowed = new Set<string>(EVENT_CATEGORY_NAMES)
+  const missing = categoryNames.filter((name) => !allowed.has(name))
   if (missing.length > 0) {
     throw Object.assign(new Error('Unknown categories'), { missingCategories: missing })
-  }
-
-  return categoryNames.map((name) => found.get(name)!)
-}
-
-async function replaceEventCategories(
-  client: PoolClient,
-  eventId: string,
-  categoryIds: number[],
-): Promise<void> {
-  await client.query(`DELETE FROM event_categories WHERE event_id = $1`, [eventId])
-  for (const categoryId of categoryIds) {
-    await client.query(
-      `INSERT INTO event_categories (event_id, category_id) VALUES ($1, $2)`,
-      [eventId, categoryId],
-    )
   }
 }
 
@@ -188,13 +144,12 @@ export async function createEvent(creatorId: string, body: CreateEventBody): Pro
   try {
     await client.query('BEGIN')
 
-    const categoryIds = await resolveCategoryIds(client, body.categoryNames)
+    validateCategoryNames(body.categoryNames)
 
     const insert = await client.query<{ id: string }>(
       `
         INSERT INTO events (
           created_by_user_id,
-          organizing_group_id,
           title,
           description,
           starts_at,
@@ -207,14 +162,14 @@ export async function createEvent(creatorId: string, body: CreateEventBody): Pro
           price_amount,
           capacity,
           notes,
-          image_object_key
+          image_object_key,
+          category_names
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING id::text
       `,
       [
         creatorId,
-        body.organizingGroupId ?? null,
         body.title,
         body.description,
         body.startsAt,
@@ -228,11 +183,11 @@ export async function createEvent(creatorId: string, body: CreateEventBody): Pro
         body.capacity ?? null,
         body.notes ?? null,
         body.imageObjectKey ?? null,
+        [...new Set(body.categoryNames)],
       ],
     )
 
     const eventId = insert.rows[0]!.id
-    await replaceEventCategories(client, eventId, categoryIds)
     // TODO(Grace): create event conversation with host as first member
     await client.query('COMMIT')
     return eventId
@@ -251,22 +206,13 @@ export async function updateEvent(eventId: string, body: UpdateEventBody, actorU
     await client.query("SELECT set_config('app.actor_user_id', $1, true)", [actorUserId])
     const locked = await client.query<{ status: string }>('SELECT status FROM events WHERE id = $1 FOR UPDATE', [eventId])
     if (locked.rows[0]?.status === 'cancelled') throw new ApiError(400, 'Cancelled events cannot be updated')
-    if (body.categoryNames) {
-      const categoryIds = await resolveCategoryIds(client, body.categoryNames)
-      const previous = await client.query<{ category_id: string }>('SELECT category_id::text FROM event_categories WHERE event_id = $1', [eventId])
-      const before = previous.rows.map((row) => row.category_id).sort().join(',')
-      const after = [...new Set(categoryIds.map(String))].sort().join(',')
-      if (before !== after) {
-        await replaceEventCategories(client, eventId, categoryIds)
-        await client.query("SELECT set_config('app.event_categories_changed', 'true', true)")
-      }
-    }
+    if (body.categoryNames) validateCategoryNames(body.categoryNames)
 
     const columns: Record<string, string> = {
       title: 'title', description: 'description', notes: 'notes', city: 'city',
       startsAt: 'starts_at', endsAt: 'ends_at', locationName: 'location_name', address: 'address',
       latitude: 'latitude', longitude: 'longitude', priceAmount: 'price_amount', capacity: 'capacity',
-      organizingGroupId: 'organizing_group_id', imageObjectKey: 'image_object_key',
+      categoryNames: 'category_names', imageObjectKey: 'image_object_key',
     }
     const sets: string[] = []
     const values: unknown[] = []
@@ -299,10 +245,7 @@ export async function cancelEvent(eventId: string, actorUserId: string): Promise
 }
 
 export async function listCategories(): Promise<{ id: string; name: string }[]> {
-  const result = await pool.query<{ id: string; name: string }>(
-    `SELECT id::text, name FROM categories ORDER BY name ASC`,
-  )
-  return result.rows
+  return [...EVENT_CATEGORIES].sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function listMyEvents(
