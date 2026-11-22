@@ -248,7 +248,10 @@ describe('PostgreSQL chat persistence', { skip: !process.env.TEST_DATABASE_URL, 
 
     await assert.rejects(
       database.query("DELETE FROM app_users WHERE firebase_uid = 'demo-cathy'"),
-      (error: NodeJS.ErrnoException & { code?: string }) => error.code === '23503',
+      // PostgreSQL 18 distinguishes RESTRICT (23001) from other FK failures.
+      (error: NodeJS.ErrnoException & { constraint?: string }) =>
+        ['23503', '23001'].includes(error.code ?? '') &&
+        /^(conversations_participant_(one|two)|messages_sender)_fkey$/.test(error.constraint ?? ''),
     )
     assert.equal((await database.query("SELECT COUNT(*)::int AS count FROM messages m JOIN app_users u ON u.firebase_uid = m.sender_user_id WHERE u.firebase_uid = 'demo-cathy'")).rows[0].count, 1)
     assert.equal((await database.query("SELECT COUNT(*)::int AS count FROM messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.kind = 'direct'")).rows[0].count, 1)
