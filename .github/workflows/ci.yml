@@ -90,3 +90,34 @@ jobs:
           path: apps/web/test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  local-deployment:
+    name: Local deployment smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node deploy/local/smoke.mjs
+      - name: Check that an older checkout cannot start against a newer schema
+        run: |
+          compose=(docker compose --project-name event-buddy-local --file deploy/local/compose.yaml)
+          "${compose[@]}" exec -T database psql -U event_buddy -d event_buddy_finder -v ON_ERROR_STOP=1 \
+            -c "INSERT INTO deployment.applied_step VALUES ('999_future_smoke_test.sql')"
+          if ./install.sh > "${RUNNER_TEMP}/deployment-downgrade.log" 2>&1; then
+            cat "${RUNNER_TEMP}/deployment-downgrade.log"
+            echo 'Expected setup to reject the newer schema.' >&2
+            exit 1
+          fi
+          cat "${RUNNER_TEMP}/deployment-downgrade.log"
+          grep -F 'The database has applied migrations missing from this checkout: 999_future_smoke_test.sql' \
+            "${RUNNER_TEMP}/deployment-downgrade.log"
+          test -z "$("${compose[@]}" ps --status running --quiet app)"
+      - name: Print deployment logs on failure
+        if: failure()
+        run: docker compose --project-name event-buddy-local --file deploy/local/compose.yaml logs --tail=100
+      - name: Stop test containers
+        if: always()
+        run: ./install.sh --stop

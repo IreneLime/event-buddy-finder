@@ -25,6 +25,7 @@ export interface DigitalOceanSpacesConfig {
   bucket: string
   accessKeyId: string
   secretAccessKey: string
+  forcePathStyle?: boolean
   downloadUrlExpiresInSeconds?: number
 }
 
@@ -39,7 +40,7 @@ export class DigitalOceanSpacesStorage implements ObjectStorage {
         accessKeyId: config.accessKeyId,
         secretAccessKey: config.secretAccessKey,
       },
-      forcePathStyle: false,
+      forcePathStyle: config.forcePathStyle ?? false,
     })
   }
 

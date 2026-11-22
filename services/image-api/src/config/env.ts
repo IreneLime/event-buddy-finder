@@ -8,6 +8,7 @@ export const env = {
     'postgresql://postgres:postgres@localhost:5432/event_buddy_finder',
   spacesEndpoint: process.env.SPACES_ENDPOINT,
   spacesRegion: process.env.SPACES_REGION ?? 'us-east-1',
+  spacesForcePathStyle: process.env.SPACES_FORCE_PATH_STYLE === 'true',
   spacesBucket: process.env.SPACES_BUCKET,
   spacesAccessKeyId: process.env.SPACES_ACCESS_KEY_ID,
   spacesSecretAccessKey: process.env.SPACES_SECRET_ACCESS_KEY,

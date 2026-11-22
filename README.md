@@ -22,6 +22,8 @@ The frontend retains demo sign-in. Apply migrations 001–004 and use the same d
 
 ## Get started
 
+For a preloaded local demo, start Docker and run `./install.sh`. See the [local setup guide](docs/deployment/README.md) for the URL and demo accounts.
+
 Requirements: Node.js 20.19+ and pnpm.
 
 ```sh
