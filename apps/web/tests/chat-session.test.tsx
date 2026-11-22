@@ -7,11 +7,6 @@ import { createDemoStore } from '../../../services/chat-api/src/seed'
 import type { ConversationMessage } from '@event-buddy/contracts'
 import type { ChatState } from '../src/state/chat-context'
 
-vi.mock('../src/lib/events-api', async () => {
-  const { starterEvents } = await import('../src/data/mock-events')
-  return { createEventsApi: () => ({ list: async () => starterEvents }) }
-})
-
 const server = createChatServer({ devMode: true })
 let auth: typeof import('../src/state/auth-store')
 let chat: typeof import('../src/state/chat-store')
@@ -59,7 +54,7 @@ function connectedUsers() {
 function AccountControls() {
   const { signIn, signOut } = auth.useAuth()
   return <>
-    {['cathy', 'mina', 'alex', 'nadia'].map((id) => <button key={id} onClick={() => signIn(`${id}@example.test`, 'demo1234')}>Log in as {id}</button>)}
+    {['cathy', 'mina', 'alex', 'nadia'].map((id) => <button key={id} onClick={() => signIn(`${id}@example.test`, '123')}>Log in as {id}</button>)}
     <button onClick={signOut}>Log out</button>
   </>
 }

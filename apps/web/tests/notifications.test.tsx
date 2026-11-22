@@ -65,7 +65,7 @@ afterAll(async () => {
 
 function Controls() {
   const { signIn } = auth.useAuth()
-  return <button onClick={() => signIn('mina@example.test', 'demo1234')}>Switch to Mina</button>
+  return <button onClick={() => signIn('mina@example.test', '123')}>Switch to Mina</button>
 }
 function Probe() { session = context.useChatStore(); return null }
 function EventTarget() { return <h1>Event {useParams().eventId} opened</h1> }

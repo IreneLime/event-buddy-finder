@@ -1,8 +1,10 @@
-let tokenProvider: () => Promise<string | undefined> = async () => undefined
+import { firebaseAuth } from './firebase'
 
-export function setApiTokenProvider(provider: typeof tokenProvider) { tokenProvider = provider }
-
-export async function apiIdentity(userId: string | undefined) {
-  const token = userId ? await tokenProvider() : undefined
-  return { token, demoUserId: !token && userId && import.meta.env.DEV ? userId : undefined }
+export async function apiIdentity(userId: string) {
+  if (firebaseAuth) {
+    const current = firebaseAuth.currentUser
+    if (current?.uid !== userId) throw new Error('Please sign in again.')
+    return { token: await current.getIdToken() }
+  }
+  return { demoUserId: import.meta.env.DEV ? userId : undefined }
 }

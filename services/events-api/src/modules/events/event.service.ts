@@ -19,13 +19,6 @@ async function assertCanManageEvent(eventId: string, userId: string) {
     return event
   }
 
-  if (event.organizing_group_id) {
-    const isOrganizer = await eventRepository.isGroupOrganizer(event.organizing_group_id, userId)
-    if (isOrganizer) {
-      return event
-    }
-  }
-
   throw new ApiError(403, 'You do not have permission to manage this event')
 }
 
@@ -59,13 +52,6 @@ export async function createEvent(userId: string, body: CreateEventBody): Promis
     throw new ApiError(400, 'User profile does not exist. Complete profile setup before creating events.')
   }
 
-  if (body.organizingGroupId) {
-    const isOrganizer = await eventRepository.isGroupOrganizer(body.organizingGroupId, userId)
-    if (!isOrganizer) {
-      throw new ApiError(403, 'You must be a group organizer to create an event for that group')
-    }
-  }
-
   try {
     const eventId = await eventRepository.createEvent(userId, body)
     return getEvent(eventId, userId)
@@ -92,13 +78,6 @@ export async function updateEvent(
   const ownership = await assertCanManageEvent(eventId, userId)
   if (ownership.status === 'cancelled') {
     throw new ApiError(400, 'Cancelled events cannot be updated')
-  }
-
-  if (body.organizingGroupId) {
-    const isOrganizer = await eventRepository.isGroupOrganizer(body.organizingGroupId, userId)
-    if (!isOrganizer) {
-      throw new ApiError(403, 'You must be a group organizer to assign that group')
-    }
   }
 
   if (body.startsAt || body.endsAt !== undefined) {

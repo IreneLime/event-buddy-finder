@@ -13,12 +13,12 @@ services/chat-api/         Express + TypeScript chat/notification service shell
 services/image-api/        Express + TypeScript profile/event image service
 packages/contracts/        Shared TypeScript domain and API types
 packages/storage/          Shared DigitalOcean Spaces-compatible client
-database/migrations/       PostgreSQL schema draft
+database/migrations/       PostgreSQL schema migrations
 ```
 
 The user service implements PostgreSQL-backed profile endpoints and delegates Bearer-token verification to the auth service. Chat adds Socket.IO messaging, a refreshed interface, and event notifications. Event chat membership reads the authoritative PostgreSQL event/RSVP records owned by events-api.
 
-The frontend retains demo sign-in. Apply the shared database migrations and use the same database URL across services to run the integrated event, chat, and notification flows.
+The frontend retains demo sign-in. Apply migrations 001–004 and use the same database URL across services to run the integrated event, chat, and notification flows. Migration 004 consolidates the schema to six application tables; see [database setup](database/README.md).
 
 ## Get started
 
@@ -43,7 +43,7 @@ Run just one app with `pnpm dev:web`, `pnpm dev:auth`, `pnpm dev:users`, `pnpm d
 - `/notifications` — saved event alerts and browser notification settings
 - `/profile` and `/profile/:userId` — profile view; edit profile is linked from the current user's page
 
-Chat messages, direct conversations, and notifications persist in PostgreSQL across service restarts. Event access follows the authoritative RSVP records. See [chat and notifications](services/chat-api/README.md) and [regression tests](docs/realtime-testing.md).
+Event participation, notifications, conversations, and messages use the consolidated PostgreSQL schema. Chat messages persist across service restarts; access is checked against the current event RSVP or direct-chat participants. See [real-time event notifications](docs/realtime-event-notifications.md) and [chat persistence](services/chat-api/README.md).
 
 ## Contributing
 

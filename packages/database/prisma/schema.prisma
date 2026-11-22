@@ -7,82 +7,35 @@ datasource db {
   provider = "postgresql"
 }
 
+// The SQL migrations remain authoritative for CHECK constraints and partial indexes.
 model AppUser {
-  firebaseUid            String                    @id @map("firebase_uid")
-  email                  String                    @unique
-  displayName            String                    @map("display_name")
-  ageRange               String?                   @map("age_range")
-  affiliation            String?
-  bio                    String?
-  profileImageKey        String?                   @map("profile_image_key")
-  profileCompletedAt     DateTime?                 @map("profile_completed_at") @db.Timestamptz(6)
-  createdAt              DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  categoryPreferences    UserCategoryPreference[]
-  groupMemberships       GroupMember[]
-  createdGroups          Group[]                   @relation("GroupCreator")
-  createdEvents          Event[]                   @relation("EventCreator")
-  participations         EventParticipation[]
-  conversationMemberships ConversationMember[]
-  notificationsReceived Notification[]             @relation("NotificationRecipient")
-  notificationsSent     Notification[]             @relation("NotificationActor")
+  firebaseUid                String         @id @map("firebase_uid")
+  email                      String         @unique
+  displayName                String         @map("display_name")
+  ageRange                   String?        @map("age_range")
+  affiliation                String?
+  bio                        String?
+  profileImageKey            String?        @map("profile_image_key")
+  profileCompletedAt         DateTime?      @map("profile_completed_at") @db.Timestamptz(6)
+  preferredCategories        String[]       @default([]) @map("preferred_categories")
+  createdAt                  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdEvents              Event[]        @relation("EventCreator")
+  participations             EventParticipation[]
+  messages                   Message[]      @relation("MessageSender")
+  notificationsReceived      Notification[] @relation("NotificationRecipient")
+  notificationsSent          Notification[] @relation("NotificationActor")
+  conversationsAsParticipantOne Conversation[] @relation("ConversationParticipantOne")
+  conversationsAsParticipantTwo Conversation[] @relation("ConversationParticipantTwo")
 
+  @@index([preferredCategories], type: Gin, map: "app_users_preferred_categories_gin_idx")
   @@map("app_users")
-}
-
-model Category {
-  id                    BigInt                    @id @default(autoincrement())
-  name                  String                    @unique
-  userPreferences       UserCategoryPreference[]
-  eventCategories       EventCategory[]
-
-  @@map("categories")
-}
-
-model UserCategoryPreference {
-  userId     String   @map("user_id")
-  categoryId BigInt   @map("category_id")
-  user       AppUser  @relation(fields: [userId], references: [firebaseUid], onDelete: Cascade)
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@id([userId, categoryId])
-  @@index([categoryId, userId])
-  @@map("user_category_preferences")
-}
-
-model Group {
-  id                 BigInt       @id @default(autoincrement())
-  name               String
-  description        String?
-  createdByUserId    String       @map("created_by_user_id")
-  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-  createdBy          AppUser      @relation("GroupCreator", fields: [createdByUserId], references: [firebaseUid], onDelete: Restrict)
-  members            GroupMember[]
-  events             Event[]
-
-  @@index([createdByUserId])
-  @@map("groups")
-}
-
-model GroupMember {
-  groupId  BigInt   @map("group_id")
-  userId   String   @map("user_id")
-  role     String   @default("member")
-  joinedAt DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
-  group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user     AppUser  @relation(fields: [userId], references: [firebaseUid], onDelete: Cascade)
-
-  @@id([groupId, userId])
-  @@index([userId, groupId])
-  @@map("group_members")
 }
 
 model Event {
   id                 BigInt                @id @default(autoincrement())
   publicId           String?               @unique @map("public_id")
   createdByUserId    String                @map("created_by_user_id")
-  organizingGroupId  BigInt?               @map("organizing_group_id")
   title              String
   description        String
   notes              String?
@@ -98,32 +51,20 @@ model Event {
   imageObjectKey     String?               @map("image_object_key")
   status             String                @default("scheduled")
   cancelledAt        DateTime?             @map("cancelled_at") @db.Timestamptz(6)
+  categoryNames      String[]              @default([]) @map("category_names")
   createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy          AppUser               @relation("EventCreator", fields: [createdByUserId], references: [firebaseUid], onDelete: Restrict)
-  organizingGroup    Group?                @relation(fields: [organizingGroupId], references: [id], onDelete: Restrict)
-  categories         EventCategory[]
   participations     EventParticipation[]
   conversation       Conversation?
   notifications      Notification[]
 
   @@index([startsAt], map: "events_starts_at_idx")
   @@index([status, locationName, startsAt], map: "events_status_location_idx")
-  @@index([organizingGroupId, startsAt], map: "events_group_idx")
   @@index([createdByUserId, createdAt(sort: Desc)], map: "events_creator_idx")
   @@index([city, status, startsAt], map: "events_city_status_starts_at_idx")
+  @@index([categoryNames], type: Gin, map: "events_category_names_gin_idx")
   @@map("events")
-}
-
-model EventCategory {
-  eventId    BigInt   @map("event_id")
-  categoryId BigInt   @map("category_id")
-  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@id([eventId, categoryId])
-  @@index([categoryId, eventId])
-  @@map("event_categories")
 }
 
 model EventParticipation {
@@ -142,36 +83,28 @@ model EventParticipation {
 }
 
 model Conversation {
-  id        BigInt              @id @default(autoincrement())
-  kind      String
-  eventId   BigInt?             @unique(map: "conversations_one_event_chat_idx") @map("event_id")
-  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  event     Event?              @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  members   ConversationMember[]
+  id                     BigInt   @id @default(autoincrement())
+  kind                   String
+  eventId                BigInt?  @unique(map: "conversations_one_event_chat_idx") @map("event_id")
+  participantOneUserId   String?  @map("participant_one_user_id")
+  participantTwoUserId   String?  @map("participant_two_user_id")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  event                  Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participantOne         AppUser? @relation("ConversationParticipantOne", fields: [participantOneUserId], references: [firebaseUid], onDelete: Restrict)
+  participantTwo         AppUser? @relation("ConversationParticipantTwo", fields: [participantTwoUserId], references: [firebaseUid], onDelete: Restrict)
+  messages               Message[]
 
   @@map("conversations")
 }
 
-model ConversationMember {
-  conversationId BigInt         @map("conversation_id")
-  userId         String         @map("user_id")
-  joinedAt       DateTime       @default(now()) @map("joined_at") @db.Timestamptz(6)
-  conversation   Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user           AppUser        @relation(fields: [userId], references: [firebaseUid], onDelete: Cascade)
-  messages       Message[]
-
-  @@id([conversationId, userId])
-  @@index([userId, conversationId])
-  @@map("conversation_members")
-}
-
 model Message {
-  id             BigInt             @id @default(autoincrement())
-  conversationId BigInt             @map("conversation_id")
-  senderUserId   String             @map("sender_user_id")
+  id             BigInt       @id @default(autoincrement())
+  conversationId BigInt       @map("conversation_id")
+  senderUserId   String       @map("sender_user_id")
   body           String
-  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  membership     ConversationMember @relation(fields: [conversationId, senderUserId], references: [conversationId, userId], onDelete: Cascade)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         AppUser      @relation("MessageSender", fields: [senderUserId], references: [firebaseUid], onDelete: Restrict)
 
   @@index([conversationId, createdAt(sort: Desc), id(sort: Desc)], map: "messages_conversation_time_idx")
   @@map("messages")
@@ -186,20 +119,12 @@ model Notification {
   message          String
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   readAt           DateTime? @map("read_at") @db.Timestamptz(6)
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz(6)
   recipient        AppUser   @relation("NotificationRecipient", fields: [recipientUserId], references: [firebaseUid], onDelete: Cascade)
   actor            AppUser?  @relation("NotificationActor", fields: [actorUserId], references: [firebaseUid], onDelete: SetNull)
   event            Event?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  delivery         NotificationOutbox?
 
   @@index([recipientUserId, createdAt(sort: Desc), id(sort: Desc)], map: "notifications_inbox_idx")
   @@index([recipientUserId, createdAt(sort: Desc)], map: "notifications_unread_idx")
   @@map("notifications")
-}
-
-model NotificationOutbox {
-  notificationId BigInt        @id @map("notification_id")
-  publishedAt    DateTime?     @map("published_at") @db.Timestamptz(6)
-  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
-
-  @@map("notification_outbox")
 }

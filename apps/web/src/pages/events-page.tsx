@@ -2,7 +2,6 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, ListFilter, MapPin, Search, SlidersHorizontal, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import type { EventSummary } from '@event-buddy/contracts'
-import { eventCategories } from '../data/mock-events'
 import { useEventStore } from '../state/event-store'
 import { EventCard } from '../components/event-card'
 import { Button } from '../components/ui/button'
@@ -54,7 +53,7 @@ function CalendarView({ events, month, onMonthChange }: { events: EventSummary[]
 }
 
 export function EventsPage() {
-  const { events } = useEventStore()
+  const { events, categories, loading, error, retry, categoriesError, retryCategories } = useEventStore()
   const { city } = useExploreCity()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
@@ -88,9 +87,9 @@ export function EventsPage() {
     const search = query.trim().toLowerCase()
     if (!search) return { matchingEvents: [], matchingCategories: [] }
     const matchingEvents = events.filter((event) => event.status === 'scheduled' && (event.city ?? 'Toronto') === city && `${event.title} ${event.locationName} ${event.categoryNames.join(' ')}`.toLowerCase().includes(search)).slice(0, 4)
-    const matchingCategories = eventCategories.filter((item) => item !== 'All events' && item.toLowerCase().includes(search)).slice(0, 2)
+    const matchingCategories = categories.filter((item) => item !== 'All events' && item.toLowerCase().includes(search)).slice(0, 2)
     return { matchingEvents, matchingCategories }
-  }, [city, events, query])
+  }, [categories, city, events, query])
 
   const calendarEvents = visibleEvents.filter((event) => {
     const date = new Date(event.startsAt)
@@ -129,11 +128,14 @@ export function EventsPage() {
         <Button variant="ghost" className="h-10 justify-self-start text-brand-700 hover:bg-brand-100 sm:justify-self-end" onClick={clearFilters}>Clear all</Button>
       </div>}
 
-      <div className="flex gap-2 overflow-x-auto pb-1">{eventCategories.map((item) => <button key={item} type="button" aria-pressed={category === item} onClick={() => setCategory(item)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition ${category === item ? 'border-brand-600 bg-brand-600 text-slate-950' : 'border-stone-200 bg-white text-stone-600 hover:border-brand-300 hover:text-brand-700'}`}>{item}</button>)}</div>
+      <div className="flex gap-2 overflow-x-auto pb-1">{['All events', ...categories].map((item) => <button key={item} type="button" aria-pressed={category === item} onClick={() => setCategory(item)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition ${category === item ? 'border-brand-600 bg-brand-600 text-slate-950' : 'border-stone-200 bg-white text-stone-600 hover:border-brand-300 hover:text-brand-700'}`}>{item}</button>)}</div>
 
       <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-stone-500"><span className="font-semibold text-stone-800">{view === 'calendar' ? calendarEvents.length : visibleEvents.length} events</span> {view === 'calendar' ? `in ${monthLabel(month)}` : 'coming up'}</p><label className="flex items-center gap-2 text-xs font-semibold text-stone-500"><span className="hidden sm:inline">Sort by</span><select aria-label="Sort events" value={sort} onChange={(event) => setSort(event.target.value as SortMode)} className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700 outline-none focus:border-brand-400"><option value="soonest">Soonest</option><option value="popular">Most popular</option><option value="price">Price: low to high</option></select></label></div>
 
-      {view === 'map' ? <Suspense fallback={<div className="grid min-h-[420px] place-items-center rounded-2xl border border-stone-200 bg-stone-50 text-sm text-stone-500">Loading interactive map…</div>}><EventsMap events={visibleEvents} city={city} /></Suspense>
+      {categoriesError && <p role="alert" className="text-sm">Could not load categories. <Button size="sm" variant="outline" onClick={retryCategories}>Retry</Button></p>}
+      {loading ? <p role="status" className="py-12 text-center">Loading events…</p>
+        : error ? <div role="alert" className="py-12 text-center">{error} <Button variant="outline" onClick={retry}>Try again</Button></div>
+        : view === 'map' ? <Suspense fallback={<div className="grid min-h-[420px] place-items-center rounded-2xl border border-stone-200 bg-stone-50 text-sm text-stone-500">Loading interactive map…</div>}><EventsMap events={visibleEvents} city={city} /></Suspense>
         : visibleEvents.length === 0 ? <div className="rounded-2xl border border-dashed border-stone-300 bg-white px-6 py-14 text-center"><p className="font-semibold text-stone-800">{events.some((event) => (event.city ?? 'Toronto') === city) ? 'No events match those filters.' : `No events in ${city} yet.`}</p><p className="mt-1 text-sm text-stone-500">{events.some((event) => (event.city ?? 'Toronto') === city) ? 'Try a different keyword, location, or date range.' : 'Choose another city to explore available events.'}</p><Button variant="secondary" size="sm" className="mt-4" onClick={clearFilters}>Clear filters</Button></div>
           : view === 'cards' ? <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{visibleEvents.map((event) => <EventCard event={event} key={event.id} />)}</div>
             : <CalendarView events={visibleEvents} month={month} onMonthChange={setMonth} />}

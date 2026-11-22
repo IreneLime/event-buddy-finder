@@ -1,3 +1,4 @@
+import { authApiIdentity } from './auth.js'
 import { createChatServer } from './app.js'
 import { PostgresNotifications } from './notifications.js'
 import { PostgresEventMembership } from './event-membership.js'
@@ -10,11 +11,15 @@ const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@
 const notifications = new PostgresNotifications(databaseUrl, devMode)
 const eventMembership = new PostgresEventMembership(databaseUrl, devMode)
 const chats = new PostgresChats(databaseUrl, devMode)
-const { httpServer, close } = createChatServer({ devMode, webOrigin: process.env.WEB_ORIGIN, notifications, eventMembership, chats })
+const verifyIdentity = devMode ? undefined : authApiIdentity(process.env.AUTH_API_URL ?? 'http://localhost:4003')
+const { httpServer, close } = createChatServer({
+  devMode, webOrigin: process.env.WEB_ORIGIN, notifications, eventMembership, verifyIdentity, chats,
+})
 
 httpServer.listen(port, host, () => {
   const address = httpServer.address()
-  console.info(`Chat/notification service listening on http://${host}:${typeof address === 'object' && address ? address.port : port} (PostgreSQL chats and notifications)`)
+  const listeningPort = typeof address === 'object' && address ? address.port : port
+  console.info(`Chat/notification service listening on http://${host}:${listeningPort} (PostgreSQL chats and notifications)`)
 })
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

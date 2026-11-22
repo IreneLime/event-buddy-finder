@@ -53,12 +53,11 @@ describe('events API owns event-chat membership', {
     url.pathname = `/${name}`
     databaseUrl = url.toString()
     database = new pg.Pool({ connectionString: databaseUrl })
-    for (const migration of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql']) {
+    for (const migration of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql', '004_consolidate_schema.sql']) {
       await database.query(await readFile(new URL(`../../../database/migrations/${migration}`, import.meta.url), 'utf8'))
     }
     await database.query(`INSERT INTO app_users(firebase_uid, email, display_name) VALUES
       ($1, 'host@example.test', 'Fresh Event Host'), ($2, 'guest@example.test', 'Fresh RSVP Guest')`, [`demo-${host}`, `demo-${guest}`])
-    await database.query("INSERT INTO categories(name) VALUES ('Music')")
     process.env.DATABASE_URL = databaseUrl
     process.env.ALLOW_DEV_AUTH = 'true'
     process.env.NODE_ENV = 'test'

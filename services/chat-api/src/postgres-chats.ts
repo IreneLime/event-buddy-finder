@@ -35,8 +35,9 @@ const messageSelect = `SELECT m.id::text, m.sender_user_id, u.display_name, m.bo
 const active = "('interested', 'going')"
 
 // The normal server uses this adapter. MemoryChatStore is only a test/demo fixture.
-// Event authorization always comes from the current RSVP, never the historical
-// conversation_members rows: deleting those rows would cascade-delete messages.
+// Event authorization always comes from the current RSVP. The consolidated
+// schema does not persist event-chat membership rows, so a withdrawal only
+// revokes access and leaves previously sent messages intact.
 export class PostgresChats implements ChatPersistence {
   private pool: pg.Pool
 
@@ -109,13 +110,13 @@ export class PostgresChats implements ChatPersistence {
     }
     const directId = /^direct-(\d+)$/.exec(id)?.[1]
     if (!directId) throw new HttpError(404, 'CONVERSATION_NOT_FOUND', 'Conversation not found.')
-    const result = await client.query<{ id: string; created_at: Date }>(
-      "SELECT id::text, created_at FROM conversations WHERE id::text = $1 AND kind = 'direct' FOR SHARE", [directId])
+    const result = await client.query<{ id: string; created_at: Date; participant_one_user_id: string; participant_two_user_id: string }>(
+      `SELECT id::text, created_at, participant_one_user_id, participant_two_user_id
+       FROM conversations WHERE id::text = $1 AND kind = 'direct' FOR SHARE`, [directId])
     const row = result.rows[0]
     if (!row) throw new HttpError(404, 'CONVERSATION_NOT_FOUND', 'Conversation not found.')
-    const members = await client.query<{ user_id: string; display_name: string }>(`SELECT cm.user_id, u.display_name
-      FROM conversation_members cm JOIN app_users u ON u.firebase_uid = cm.user_id
-      WHERE cm.conversation_id = $1 ORDER BY cm.user_id`, [row.id])
+    const members = await client.query<{ user_id: string; display_name: string }>(`SELECT firebase_uid AS user_id, display_name
+      FROM app_users WHERE firebase_uid = ANY($1::text[]) ORDER BY firebase_uid`, [[row.participant_one_user_id, row.participant_two_user_id]])
     const conversation = this.authorize({ databaseId: row.id, id: `direct-${row.id}`, kind: 'direct', title: '',
       createdAt: row.created_at.toISOString(), members: members.rows.map((member) => ({ userId: this.chatUser(member.user_id), displayName: member.display_name })) }, userId)
     conversation.title = conversation.members.find((member) => member.userId !== userId)?.displayName ?? 'Direct message'
@@ -161,7 +162,7 @@ export class PostgresChats implements ChatPersistence {
         LEFT JOIN event_participations p ON p.event_id = e.id AND p.user_id = $1
         WHERE p.status IN ${active} OR (e.created_by_user_id = $1 AND p.user_id IS NULL)`, [this.databaseUser(userId)])
       const directs = await client.query<{ id: string }>(`SELECT c.id::text FROM conversations c
-        JOIN conversation_members cm ON cm.conversation_id = c.id WHERE c.kind = 'direct' AND cm.user_id = $1`, [this.databaseUser(userId)])
+        WHERE c.kind = 'direct' AND $1 IN (c.participant_one_user_id, c.participant_two_user_id)`, [this.databaseUser(userId)])
       const summaries: ConversationSummary[] = []
       for (const event of events.rows) {
         // A concurrent withdrawal between listing IDs and loading the event may
@@ -191,7 +192,12 @@ export class PostgresChats implements ChatPersistence {
     const targetId = requiredText(target, 'userId', 150)
     if (userId === targetId) throw new HttpError(400, 'INVALID_INPUT', 'Choose another user to message.')
     return this.transaction(async (client) => {
-      const users = [this.databaseUser(userId), this.databaseUser(targetId)].sort()
+      // Use the database collation, matching migration 004's pair constraint
+      // and unique index even when Firebase UIDs contain mixed case.
+      const pair = await client.query<{ first_user: string; second_user: string }>(
+        'SELECT LEAST($1::text, $2::text) AS first_user, GREATEST($1::text, $2::text) AS second_user',
+        [this.databaseUser(userId), this.databaseUser(targetId)])
+      const users = [pair.rows[0].first_user, pair.rows[0].second_user]
       // All callers use the same ordered pair lock, including reverse requests
       // on another server, so creating a DM concurrently cannot duplicate it.
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [JSON.stringify(users)])
@@ -202,15 +208,13 @@ export class PostgresChats implements ChatPersistence {
           AND (b.status IN ${active} OR (e.created_by_user_id = $2 AND b.user_id IS NULL)) LIMIT 1`, users)
       if (!shared.rowCount) throw new HttpError(403, 'FORBIDDEN', 'You must share an event to start a direct message.')
       const existing = await client.query<{ id: string }>(`SELECT c.id::text FROM conversations c
-        WHERE c.kind = 'direct' AND (SELECT COUNT(*) FROM conversation_members cm WHERE cm.conversation_id = c.id) = 2
-          AND EXISTS (SELECT 1 FROM conversation_members cm WHERE cm.conversation_id = c.id AND cm.user_id = $1)
-          AND EXISTS (SELECT 1 FROM conversation_members cm WHERE cm.conversation_id = c.id AND cm.user_id = $2)
+        WHERE c.kind = 'direct' AND c.participant_one_user_id = $1 AND c.participant_two_user_id = $2
         ORDER BY c.id LIMIT 1`, users)
       let id = existing.rows[0]?.id
       if (!id) {
-        const inserted = await client.query<{ id: string }>("INSERT INTO conversations(kind) VALUES ('direct') RETURNING id::text")
+        const inserted = await client.query<{ id: string }>(`INSERT INTO conversations(kind, participant_one_user_id, participant_two_user_id)
+          VALUES ('direct', $1, $2) RETURNING id::text`, users)
         id = inserted.rows[0].id
-        await client.query('INSERT INTO conversation_members(conversation_id, user_id) VALUES ($1, $2), ($1, $3)', [id, ...users])
       }
       return this.describe(client, await this.load(client, `direct-${id}`, userId))
     })
@@ -221,7 +225,6 @@ export class PostgresChats implements ChatPersistence {
       const conversation = await this.load(client, id, userId, true)
       const text = requiredText(body, 'body', 2000)
       const sender = this.databaseUser(userId)
-      await client.query('INSERT INTO conversation_members(conversation_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [conversation.databaseId, sender])
       const saved = await client.query<{ id: string; created_at: Date }>(
         'INSERT INTO messages(conversation_id, sender_user_id, body) VALUES ($1, $2, $3) RETURNING id::text, created_at', [conversation.databaseId, sender, text])
       const message: ConversationMessage = { id: saved.rows[0].id, conversationId: conversation.id, senderUserId: userId,

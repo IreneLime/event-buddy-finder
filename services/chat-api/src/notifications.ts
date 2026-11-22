@@ -106,11 +106,10 @@ export class PostgresNotifications implements NotificationStore {
       try {
         await client.query('BEGIN')
         const batch = await client.query<NotificationRow>(`${selectNotification}
-          JOIN notification_outbox delivery ON delivery.notification_id = n.id
-          WHERE delivery.published_at IS NULL ORDER BY n.id LIMIT 100
-          FOR UPDATE OF delivery SKIP LOCKED`)
+          WHERE n.published_at IS NULL AND n.event_id IS NOT NULL
+          ORDER BY n.id LIMIT 100 FOR UPDATE OF n SKIP LOCKED`)
         for (const row of batch.rows) publish(this.socketUser(row.recipient_user_id), item(row))
-        if (batch.rows.length) await client.query('UPDATE notification_outbox SET published_at = NOW() WHERE notification_id = ANY($1::bigint[])', [batch.rows.map((row) => row.id)])
+        if (batch.rows.length) await client.query('UPDATE notifications SET published_at = NOW() WHERE id = ANY($1::bigint[])', [batch.rows.map((row) => row.id)])
         await client.query('COMMIT')
         if (batch.rows.length < 100) break
       } catch (error) { await client.query('ROLLBACK'); throw error }
