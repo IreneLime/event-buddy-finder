@@ -4,19 +4,22 @@ React and TypeScript SPA using Vite, React Router, Tailwind CSS, and shared UI c
 
 ## Run the demo
 
-Run `pnpm install` from the repo root. Chat is a separate service, so start it and the web app in two terminals:
+Run `pnpm install` from the repo root. The chat and user profile APIs are separate services, so start them and the web app in three terminals:
 
 ```sh
 # Terminal 1: use a local PostgreSQL database with migrations 001–003 and demo data applied.
 DATABASE_URL=postgresql://YOUR_ROLE@localhost:5432/YOUR_DATABASE pnpm dev:chat
 
-# Terminal 2
+# Terminal 2: use the same database for public profile lookups.
+DATABASE_URL=postgresql://YOUR_ROLE@localhost:5432/YOUR_DATABASE pnpm dev:users
+
+# Terminal 3
 pnpm dev:web
 ```
 
-In development, chat accepts the demo identity and maps `cathy` to the `demo-cathy` PostgreSQL profile. The `VITE_CHAT_API_URL` default points to `http://localhost:4002`; set it in `apps/web/.env.local` if the chat service uses another address. With Firebase and the events API unconfigured, the web app uses local demo accounts and event fixtures, but chat still reads its profiles and event memberships from PostgreSQL.
+In development, chat accepts the demo identity and maps `cathy` to the `demo-cathy` PostgreSQL profile. The `VITE_CHAT_API_URL` default points to `http://localhost:4002`; set it in `apps/web/.env.local` if the chat service uses another address. Public profile pages call the user service at `http://localhost:4004`. With Firebase and the events API unconfigured, the web app uses local demo accounts and event fixtures, but chat and public profiles still read identities and memberships from PostgreSQL.
 
-If the chat sidebar shows a connection error, first check that `pnpm dev:chat` is running and that its `DATABASE_URL` points to the seeded project database.
+If chats show a connection error, check that `pnpm dev:chat` is running and that its `DATABASE_URL` points to the seeded project database. If a public profile shows a service error, start `pnpm dev:users` with the same database URL.
 
 ## Connect the APIs
 
