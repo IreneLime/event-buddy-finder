@@ -1,12 +1,13 @@
 -- Fictional local development fixtures only. These Firebase UIDs are placeholders;
 -- they are not accounts in Firebase and must never be used as production identities.
+BEGIN;
 
 INSERT INTO app_users (firebase_uid, email, display_name, age_range, affiliation, bio, profile_completed_at)
 VALUES
-  ('demo-cathy', 'cathy@example.test', 'Cathy Chen', '18_24', 'University of Toronto · ECE', 'Always up for a new café, live music, or a creative afternoon. Currently learning pottery.', NOW()),
-  ('demo-mina', 'mina@example.test', 'Mina Park', '25_34', 'University of Toronto · Architecture', 'Weekend market wanderer and enthusiastic dumpling recommender. Happy to meet new neighbours.', NOW()),
-  ('demo-alex', 'alex@example.test', 'Alex Rivera', '25_34', 'Toronto Arts Community', 'Board games, park walks, and discovering small live-music venues.', NOW()),
-  ('demo-nadia', 'nadia@example.test', 'Nadia Chen', '18_24', 'Markham Community Arts Council', 'I like flower markets, dance workshops, and taking far too many photos.', NOW())
+  ('demo-cathy', 'cathy@example.test', 'Cathy Chen', '18_24', 'University of Toronto · ECE', 'I study electrical and computer engineering in Toronto. On weekends I look for pottery workshops, small concerts, and cafés worth going back to. I usually bring a camera on walks and am happy to meet up early if you’re coming solo.', NOW()),
+  ('demo-mina', 'mina@example.test', 'Mina Park', '25_34', 'University of Toronto · Architecture', 'I’m an architecture student who likes sketching storefronts and looking up the stories behind old buildings. My ideal Saturday is a neighbourhood market followed by dumplings. I host easy walks with time for coffee and a few detours.', NOW()),
+  ('demo-alex', 'alex@example.test', 'Alex Rivera', '25_34', 'Toronto Arts Community', 'I organize small board game nights in Toronto and enjoy teaching games to people who haven’t played before. I’m also working through a list of local live-music venues. On a quiet weekend, you’ll find me walking in High Park with a coffee.', NOW()),
+  ('demo-nadia', 'nadia@example.test', 'Nadia Chen', '18_24', 'Markham Community Arts Council', 'I volunteer with community arts events in Markham and take photos of local markets. I like gallery afternoons and dance classes where everyone is learning together. I’m always up for trading tips on nearby makers and workshops.', NOW())
 ON CONFLICT (firebase_uid) DO UPDATE SET
   email = EXCLUDED.email,
   display_name = EXCLUDED.display_name,
@@ -19,6 +20,17 @@ ON CONFLICT (firebase_uid) DO UPDATE SET
 INSERT INTO categories (name) VALUES
   ('Arts'), ('Community'), ('Dance'), ('Food'), ('Games'), ('Markets'), ('Music'), ('Outdoors'), ('Social'), ('Wellness')
 ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO user_category_preferences (user_id, category_id)
+SELECT seed.user_id, category.id
+FROM (VALUES
+  ('demo-cathy', 'Arts'), ('demo-cathy', 'Food'), ('demo-cathy', 'Music'),
+  ('demo-mina', 'Food'), ('demo-mina', 'Community'), ('demo-mina', 'Arts'),
+  ('demo-alex', 'Games'), ('demo-alex', 'Outdoors'), ('demo-alex', 'Music'),
+  ('demo-nadia', 'Arts'), ('demo-nadia', 'Markets'), ('demo-nadia', 'Dance')
+) AS seed(user_id, category_name)
+JOIN categories category ON category.name = seed.category_name
+ON CONFLICT (user_id, category_id) DO NOTHING;
 
 -- Fixed sample event dates make the seed reproducible for the Fall 2026 demo.
 INSERT INTO events (
@@ -151,3 +163,5 @@ WHERE EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversatio
   AND EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversation_id = conversation.id AND member.user_id = 'demo-cathy')
   AND EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversation_id = conversation.id AND member.user_id = 'demo-mina')
   AND NOT EXISTS (SELECT 1 FROM messages existing WHERE existing.conversation_id = conversation.id AND existing.sender_user_id = seed.sender_id AND existing.body = seed.body);
+
+COMMIT;
