@@ -39,7 +39,6 @@ export default defineConfig({
       FIREBASE_PROJECT_ID: 'demo-event-buddy',
       FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9199',
       CHAT_DEV_MODE: 'false',
-      CHAT_LOAD_DEMO_HISTORY: 'false',
       VITE_FIREBASE_API_KEY: 'event-buddy-e2e-api-key',
       VITE_FIREBASE_AUTH_DOMAIN: 'localhost',
       VITE_FIREBASE_PROJECT_ID: 'demo-event-buddy',

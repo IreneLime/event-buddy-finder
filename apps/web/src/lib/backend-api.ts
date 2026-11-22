@@ -78,7 +78,8 @@ export const profileApi = {
     request<UserEventHistoryResponse>(usersApiUrl, `${profilePath(id)}/events?page=${page}`, { signal }),
 }
 
-type EventFields = Pick<EventSummary, 'title' | 'description' | 'startsAt' | 'endsAt' | 'locationName' | 'city' | 'latitude' | 'longitude' | 'categoryNames' | 'priceAmount'> & {
+type EventFields = Pick<EventSummary, 'title' | 'description' | 'startsAt' | 'locationName' | 'city' | 'latitude' | 'longitude' | 'categoryNames' | 'priceAmount'> & {
+  endsAt?: string | null
   address?: string | null
   notes?: string | null
 }

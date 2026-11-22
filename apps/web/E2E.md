@@ -25,4 +25,4 @@ pnpm test:e2e
 
 The Playwright command starts Firebase Auth Emulator and all application services, then opens Chromium. The E2E-created Firebase accounts are ephemeral emulator accounts; user profiles and events live only in the dedicated E2E database. To rerun from a clean database, drop and recreate only `event_buddy_e2e`, then repeat the commands above.
 
-To exercise migration 004 as well, run the same script from the PR #15 branch; it detects and applies that migration before loading the demo seeds.
+The preparation script applies migrations 001–004 and loads the demo seeds. The browser flow uses the consolidated six-table schema and PostgreSQL chat persistence.
