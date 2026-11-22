@@ -53,6 +53,10 @@ to hard-coded chat fixtures. For Firebase locally, run `CHAT_DEV_MODE=false pnpm
   membership table, so leaving an event chat revokes access without deleting
   message history. Foreign keys restrict hard deletion of accounts referenced
   by chat history.
+- The PostgreSQL persistence tests apply migrations 001–004 and verify that
+  seeded event/direct history survives, direct chats use the consolidated
+  participant columns, and a profile referenced by chat history cannot be
+  hard-deleted.
 
 ## API
 
