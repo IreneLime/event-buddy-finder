@@ -4,7 +4,19 @@ React and TypeScript SPA using Vite, React Router, Tailwind CSS, and shared UI c
 
 ## Run the demo
 
-Run `pnpm install` and `pnpm dev:web` from the repo root. With Firebase and the events API unconfigured, the app uses local demo accounts and events. The chat screen connects to chat-api.
+Run `pnpm install` from the repo root. Chat is a separate service, so start it and the web app in two terminals:
+
+```sh
+# Terminal 1: use a local PostgreSQL database with migrations 001–003 and demo data applied.
+DATABASE_URL=postgresql://YOUR_ROLE@localhost:5432/YOUR_DATABASE pnpm dev:chat
+
+# Terminal 2
+pnpm dev:web
+```
+
+In development, chat accepts the demo identity and maps `cathy` to the `demo-cathy` PostgreSQL profile. The `VITE_CHAT_API_URL` default points to `http://localhost:4002`; set it in `apps/web/.env.local` if the chat service uses another address. With Firebase and the events API unconfigured, the web app uses local demo accounts and event fixtures, but chat still reads its profiles and event memberships from PostgreSQL.
+
+If the chat sidebar shows a connection error, first check that `pnpm dev:chat` is running and that its `DATABASE_URL` points to the seeded project database.
 
 ## Connect the APIs
 
