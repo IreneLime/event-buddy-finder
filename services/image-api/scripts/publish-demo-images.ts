@@ -19,8 +19,8 @@ if (serviceAccount.project_id !== projectId) throw new Error('Firebase service a
 const keep = process.argv.includes('--keep')
 const cleanup = process.argv.includes('--cleanup')
 if (keep === cleanup) throw new Error('Choose exactly one mode: --keep to publish persistent demo images, or --cleanup to verify and remove the upload.')
-if (keep && process.env.PUBLISH_DEMO_IMAGES_CONFIRM !== 'UPLOAD_EVENT_BUDDY_DEMO_IMAGES') {
-  throw new Error('Set PUBLISH_DEMO_IMAGES_CONFIRM=UPLOAD_EVENT_BUDDY_DEMO_IMAGES to keep the images in the configured demo bucket/database.')
+if (keep && process.env.PUBLISH_DEMO_IMAGES_CONFIRM !== 'UPLOAD_DEMO_IMAGES') {
+  throw new Error('Set PUBLISH_DEMO_IMAGES_CONFIRM=UPLOAD_DEMO_IMAGES to keep the images in the configured demo bucket/database.')
 }
 
 const databaseUrl = required('DATABASE_URL')
