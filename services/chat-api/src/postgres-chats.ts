@@ -77,9 +77,9 @@ export class PostgresChats implements ChatPersistence {
     const event = result.rows[0]
     if (!event) throw new HttpError(404, 'EVENT_NOT_FOUND', 'Event not found.')
     if (sending) {
-      // Serialize an existing RSVP change with a send. After a withdrawal commits,
-      // even an already-connected socket must fail before inserting a message.
-      await client.query('SELECT user_id FROM event_participations WHERE event_id = $1 ORDER BY user_id FOR SHARE', [event.id])
+      // Match events-api's RSVP upsert lock before reading membership. Row locks
+      // cannot protect an organizer's implicit access when no RSVP exists yet.
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended('event-membership:' || $1::text, 0))", [event.id])
     }
     const members = await client.query<{ user_id: string; display_name: string }>(`SELECT u.firebase_uid AS user_id, u.display_name
       FROM app_users u LEFT JOIN event_participations p ON p.user_id = u.firebase_uid AND p.event_id = $1

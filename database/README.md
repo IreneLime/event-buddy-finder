@@ -31,6 +31,7 @@ The schema is maintained as PostgreSQL SQL migrations, with Prisma ORM 7 providi
 - An event has a creator and may have an organizing group. Group organizer permissions and event ownership must be checked by the backend; attendees can mark themselves interested or going without organizer approval.
 - `event_participations` has at most one current row per user and event, with a status of `interested`, `going`, or `withdrawn`. An event's `cancelled` status is separate from a user's `withdrawn` participation status.
 - RSVP changes go through events-api. Chat lookup never enrolls a user: only current interested/going participants and an organizer without an overriding RSVP can access an event chat. Chat stores messages and historical sender membership in one transaction; withdrawal revokes access without deleting these rows or cascading away previous messages. Direct conversations contain two users; concurrent requests for the same pair reuse the existing conversation.
+- Event-chat sends and RSVP upserts acquire the same transaction-scoped advisory lock, keyed by `hashtextextended('event-membership:' || event_id::text, 0)`, before reading or changing participation. This also serializes a creator's first withdrawal when no participation row exists to lock. If withdrawal acquires the lock first, the send waits for its commit and excludes the former member (or rejects that sender).
 - Event updates and cancellations should save a notification for each affected interested or going attendee before Socket.IO broadcasts to currently connected users. The inbox indexes support loading recent and unread notifications.
 - `profile_image_key` and `events.image_object_key` store DigitalOcean Spaces object keys. Image bytes stay in Spaces; the TypeScript backend will handle upload and download access and associate each key with its profile or event record.
 - Development image integration can be seeded after the schema with `psql "$DATABASE_URL" -f database/seeds/001_demo_images.sql`. The seed creates a demo profile and event that reference private fixtures already uploaded to the development bucket; do not apply it in production.
@@ -39,7 +40,7 @@ The schema is maintained as PostgreSQL SQL migrations, with Prisma ORM 7 providi
 ## Initial assumptions to review
 
 - Users choose whether they are interested or going; the app does not have an organizer approval step for attendance.
-- Chat membership requires an interested or going participation status; joining the chat records interest if the user has no participation row yet.
+- Chat membership requires an interested or going participation status, with implicit creator access until an explicit RSVP overrides it. Joining writes interest through events-api; reading chat never changes participation.
 - Group event creation and management require an `organizer` membership role.
 - Event location is stored as a display name/address, with optional coordinates for map pins.
 
@@ -47,3 +48,9 @@ The schema is maintained as PostgreSQL SQL migrations, with Prisma ORM 7 providi
 ## Event notification integration
 
 Grace's migration `003_realtime_event_notifications.sql` adds persisted alerts and a notification outbox. Apply it only after the separately maintained event city/notes migration (002) is integrated.
+
+## Chat persistence and schema consolidation
+
+For the final submission, integrate and verify [chat persistence (#17)](https://github.com/IreneLime/event-buddy-finder/pull/17) and its review fixes against migrations 001–003 first. Keep the existing schema, including `conversation_members`: persistent direct-chat lookup and historical message foreign keys depend on it. No schema migration is required for these fixes.
+
+[The six-table consolidation (#15)](https://github.com/IreneLime/event-buddy-finder/pull/15) removes `conversation_members` and is a separate integration step. It must not be merged unchanged with this persistence adapter. If both changes are selected, stack the chat implementation on the consolidation, update direct-conversation lookup/creation and message writes for that schema, and rerun `pnpm test:realtime`, `TEST_DATABASE_URL=... pnpm test:realtime:db`, `pnpm build`, and `pnpm typecheck`. The PostgreSQL suite must pass its actual process-restart, seeded-history, membership/withdrawal, and failed-commit cases against the selected migrations before that combined change is ready.
