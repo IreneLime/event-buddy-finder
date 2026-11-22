@@ -1,0 +1,208 @@
+name: Live Firebase and Spaces integration
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Select a non-production live check or publish demo photos to a seeded demo database
+        required: true
+        type: choice
+        options:
+          - verify_live_flow
+          - publish_demo_images
+      confirmation:
+        description: Type RUN_LIVE_CLOUD_TESTS or UPLOAD_DEMO_IMAGES to confirm the selected live operation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: event-buddy-live-cloud
+  cancel-in-progress: false
+
+jobs:
+  typecheck-live-scripts:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @event-buddy/image-api typecheck
+
+  verify-live-flow:
+    if: inputs.mode == 'verify_live_flow' && inputs.confirmation == 'RUN_LIVE_CLOUD_TESTS'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: live-integration
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: event_buddy_e2e_live
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d event_buddy_e2e_live"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/event_buddy_e2e_live
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/event_buddy_e2e_live
+      FIREBASE_PROJECT_ID: ${{ secrets.LIVE_FIREBASE_PROJECT_ID }}
+      LIVE_FIREBASE_API_KEY: ${{ secrets.LIVE_FIREBASE_API_KEY }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.LIVE_FIREBASE_SERVICE_ACCOUNT_JSON }}
+      SPACES_ENDPOINT: ${{ secrets.LIVE_SPACES_ENDPOINT }}
+      SPACES_REGION: us-east-1
+      SPACES_BUCKET: ${{ secrets.LIVE_SPACES_BUCKET }}
+      SPACES_ACCESS_KEY_ID: ${{ secrets.LIVE_SPACES_ACCESS_KEY_ID }}
+      SPACES_SECRET_ACCESS_KEY: ${{ secrets.LIVE_SPACES_SECRET_ACCESS_KEY }}
+      SPACES_DOWNLOAD_URL_EXPIRES_IN_SECONDS: '300'
+      AUTH_API_URL: http://127.0.0.1:4103
+      LIVE_AUTH_API_URL: http://127.0.0.1:4103
+      LIVE_USERS_API_URL: http://127.0.0.1:4104
+      LIVE_EVENTS_API_URL: http://127.0.0.1:4101
+      LIVE_IMAGE_API_URL: http://127.0.0.1:4105
+      ALLOW_DEV_AUTH: 'false'
+      CHAT_DEV_MODE: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Check live credentials and target project
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in FIREBASE_PROJECT_ID LIVE_FIREBASE_API_KEY FIREBASE_SERVICE_ACCOUNT_JSON SPACES_ENDPOINT SPACES_BUCKET SPACES_ACCESS_KEY_ID SPACES_SECRET_ACCESS_KEY; do
+            if [[ -z "${!name:-}" ]]; then echo "Missing required secret for $name in the live-integration environment." >&2; exit 1; fi
+          done
+          if [[ "$FIREBASE_PROJECT_ID" != *-ci ]]; then
+            echo 'LIVE_FIREBASE_PROJECT_ID must identify a dedicated non-production Firebase project ending in -ci.' >&2
+            exit 1
+          fi
+      - name: Provide the Firebase Admin key to the events API
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.LIVE_FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+          const { randomUUID } = require('node:crypto')
+          const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_JSON)
+          const delimiter = `FIREBASE_KEY_${randomUUID()}`
+          fs.appendFileSync(process.env.GITHUB_ENV,
+            `FIREBASE_CLIENT_EMAIL=${serviceAccount.client_email}\nFIREBASE_PRIVATE_KEY<<${delimiter}\n${serviceAccount.private_key}\n${delimiter}\n`)
+          NODE
+      - run: pnpm install --frozen-lockfile
+      - name: Prepare disposable PostgreSQL database and mock events
+        run: bash scripts/prepare-e2e-database.sh
+      - name: Start real-auth and real-storage API stack
+        run: |
+          pnpm dev:live-cloud > "$RUNNER_TEMP/live-cloud-apis.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/live-cloud-apis.pid"
+          for port in 4101 4103 4104 4105; do
+            for attempt in {1..60}; do
+              if curl --silent --fail "http://127.0.0.1:$port/health" >/dev/null; then break; fi
+              sleep 1
+            done
+            curl --silent --show-error --fail "http://127.0.0.1:$port/health" >/dev/null
+          done
+      - name: Exercise Firebase, app APIs, PostgreSQL, and Spaces
+        run: pnpm test:live-cloud
+      - name: Upload and verify the three mock event photos through the image API
+        run: pnpm --filter @event-buddy/image-api exec tsx scripts/publish-demo-images.ts --cleanup
+      - name: Print service logs on failure
+        if: failure()
+        run: cat "$RUNNER_TEMP/live-cloud-apis.log"
+      - name: Stop API processes
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/live-cloud-apis.pid" ]]; then kill "$(cat "$RUNNER_TEMP/live-cloud-apis.pid")" 2>/dev/null || true; fi
+
+  publish-demo-images:
+    if: inputs.mode == 'publish_demo_images' && inputs.confirmation == 'UPLOAD_DEMO_IMAGES'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: live-integration
+    env:
+      DATABASE_URL: ${{ secrets.DEMO_DATABASE_URL }}
+      FIREBASE_PROJECT_ID: ${{ secrets.LIVE_FIREBASE_PROJECT_ID }}
+      LIVE_FIREBASE_API_KEY: ${{ secrets.LIVE_FIREBASE_API_KEY }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.LIVE_FIREBASE_SERVICE_ACCOUNT_JSON }}
+      SPACES_ENDPOINT: ${{ secrets.LIVE_SPACES_ENDPOINT }}
+      SPACES_REGION: us-east-1
+      SPACES_BUCKET: ${{ secrets.DEMO_SPACES_BUCKET }}
+      SPACES_ACCESS_KEY_ID: ${{ secrets.LIVE_SPACES_ACCESS_KEY_ID }}
+      SPACES_SECRET_ACCESS_KEY: ${{ secrets.LIVE_SPACES_SECRET_ACCESS_KEY }}
+      SPACES_DOWNLOAD_URL_EXPIRES_IN_SECONDS: '300'
+      AUTH_API_URL: http://127.0.0.1:4103
+      LIVE_AUTH_API_URL: http://127.0.0.1:4103
+      LIVE_IMAGE_API_URL: http://127.0.0.1:4105
+      ALLOW_DEV_AUTH: 'false'
+      PUBLISH_DEMO_IMAGES_CONFIRM: ${{ inputs.confirmation }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Check publishing target
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in DATABASE_URL FIREBASE_PROJECT_ID LIVE_FIREBASE_API_KEY FIREBASE_SERVICE_ACCOUNT_JSON SPACES_ENDPOINT SPACES_BUCKET SPACES_ACCESS_KEY_ID SPACES_SECRET_ACCESS_KEY; do
+            if [[ -z "${!name:-}" ]]; then echo "Missing required secret for $name in the live-integration environment." >&2; exit 1; fi
+          done
+          if [[ "$FIREBASE_PROJECT_ID" != *-ci ]]; then
+            echo 'Use a dedicated non-production Firebase project ending in -ci.' >&2
+            exit 1
+          fi
+      - run: pnpm install --frozen-lockfile
+      - name: Start image and authentication APIs against the seeded demo database
+        run: |
+          PORT=4103 pnpm --filter @event-buddy/auth-api dev > "$RUNNER_TEMP/demo-image-auth.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/demo-image-auth.pid"
+          PORT=4105 pnpm --filter @event-buddy/image-api dev > "$RUNNER_TEMP/demo-image-api.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/demo-image-api.pid"
+          for port in 4103 4105; do
+            for attempt in {1..60}; do
+              if curl --silent --fail "http://127.0.0.1:$port/health" >/dev/null; then break; fi
+              sleep 1
+            done
+            curl --silent --show-error --fail "http://127.0.0.1:$port/health" >/dev/null
+          done
+      - name: Upload and retain mock event images in Spaces and PostgreSQL
+        run: pnpm --filter @event-buddy/image-api exec tsx scripts/publish-demo-images.ts --keep
+      - name: Print service logs on failure
+        if: failure()
+        run: cat "$RUNNER_TEMP/demo-image-auth.log" "$RUNNER_TEMP/demo-image-api.log"
+      - name: Stop API processes
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/demo-image-auth.pid" ]]; then kill "$(cat "$RUNNER_TEMP/demo-image-auth.pid")" 2>/dev/null || true; fi
+          if [[ -f "$RUNNER_TEMP/demo-image-api.pid" ]]; then kill "$(cat "$RUNNER_TEMP/demo-image-api.pid")" 2>/dev/null || true; fi
+
+  reject-unconfirmed-run:
+    if: (inputs.mode == 'verify_live_flow' && inputs.confirmation != 'RUN_LIVE_CLOUD_TESTS') || (inputs.mode == 'publish_demo_images' && inputs.confirmation != 'UPLOAD_DEMO_IMAGES')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Confirmation text did not match the selected live operation.' >&2; exit 1
