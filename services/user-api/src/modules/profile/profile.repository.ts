@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg'
+import { EVENT_CATEGORY_NAMES } from '@event-buddy/contracts'
 
 import { pool } from '../../db/pool.js'
 import type { ProfileRow } from './profile.mapper.js'
@@ -14,14 +15,8 @@ const PROFILE_SELECT = `
     u.bio,
     u.profile_image_key,
     u.profile_completed_at,
-    COALESCE(
-      array_agg(c.name ORDER BY c.name)
-        FILTER (WHERE c.name IS NOT NULL),
-      '{}'
-    ) AS preferred_categories
+    u.preferred_categories
   FROM app_users u
-  LEFT JOIN user_category_preferences ucp ON ucp.user_id = u.firebase_uid
-  LEFT JOIN categories c ON c.id = ucp.category_id
 `
 
 async function queryProfile(
@@ -29,11 +24,7 @@ async function queryProfile(
   userId: string,
 ): Promise<ProfileRow | undefined> {
   const result = await database.query<ProfileRow>(
-    `
-      ${PROFILE_SELECT}
-      WHERE u.firebase_uid = $1
-      GROUP BY u.firebase_uid
-    `,
+    `${PROFILE_SELECT} WHERE u.firebase_uid = $1`,
     [userId],
   )
   return result.rows[0]
@@ -43,45 +34,17 @@ export async function getProfileById(userId: string): Promise<ProfileRow | undef
   return queryProfile(pool, userId)
 }
 
-async function resolveCategoryIds(
-  client: PoolClient,
-  categoryNames: string[],
-): Promise<number[]> {
-  if (categoryNames.length === 0) return []
-  const result = await client.query<{ id: string; name: string }>(
-    `SELECT id::text, name FROM categories WHERE name = ANY($1::text[])`,
-    [categoryNames],
-  )
-  const categoryIds = new Map(result.rows.map((row) => [row.name, Number(row.id)]))
-  const missingCategories = categoryNames.filter((name) => !categoryIds.has(name))
+export async function findMissingCategories(categoryNames: string[]): Promise<string[]> {
+  const allowed = new Set<string>(EVENT_CATEGORY_NAMES)
+  return categoryNames.filter((name) => !allowed.has(name))
+}
+
+function assertKnownCategories(categoryNames: string[]): void {
+  const allowed = new Set<string>(EVENT_CATEGORY_NAMES)
+  const missingCategories = categoryNames.filter((name) => !allowed.has(name))
   if (missingCategories.length > 0) {
     throw Object.assign(new Error('Unknown categories'), { missingCategories })
   }
-  return categoryNames.map((name) => categoryIds.get(name)!)
-}
-
-async function replaceCategoryPreferences(
-  client: PoolClient,
-  userId: string,
-  categoryIds: number[],
-): Promise<void> {
-  await client.query(`DELETE FROM user_category_preferences WHERE user_id = $1`, [userId])
-  for (const categoryId of categoryIds) {
-    await client.query(
-      `INSERT INTO user_category_preferences (user_id, category_id) VALUES ($1, $2)`,
-      [userId, categoryId],
-    )
-  }
-}
-
-export async function findMissingCategories(categoryNames: string[]): Promise<string[]> {
-  if (categoryNames.length === 0) return []
-  const result = await pool.query<{ name: string }>(
-    `SELECT name FROM categories WHERE name = ANY($1::text[])`,
-    [categoryNames],
-  )
-  const found = new Set(result.rows.map((row) => row.name))
-  return categoryNames.filter((name) => !found.has(name))
 }
 
 export async function createProfile(
@@ -92,14 +55,12 @@ export async function createProfile(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    const categoryIds = await resolveCategoryIds(client, profile.preferredCategories)
+    assertKnownCategories(profile.preferredCategories)
     await client.query(
-      `
-        INSERT INTO app_users (
-          firebase_uid, email, display_name, age_range, affiliation, bio, profile_completed_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, NOW())
-      `,
+      `INSERT INTO app_users (
+        firebase_uid, email, display_name, age_range, affiliation, bio,
+        preferred_categories, profile_completed_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
       [
         userId,
         email,
@@ -107,9 +68,9 @@ export async function createProfile(
         profile.ageRange ?? null,
         profile.affiliation ?? null,
         profile.bio ?? null,
+        [...new Set(profile.preferredCategories)],
       ],
     )
-    await replaceCategoryPreferences(client, userId, categoryIds)
     const savedProfile = await queryProfile(client, userId)
     if (!savedProfile) throw new Error('Profile was not returned after creation')
     await client.query('COMMIT')
@@ -130,10 +91,7 @@ export async function updateProfile(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    const categoryIds =
-      profile.preferredCategories === undefined
-        ? undefined
-        : await resolveCategoryIds(client, profile.preferredCategories)
+    if (profile.preferredCategories !== undefined) assertKnownCategories(profile.preferredCategories)
 
     const values: unknown[] = [email]
     const assignments = ['email = $1']
@@ -145,6 +103,9 @@ export async function updateProfile(
     if (profile.ageRange !== undefined) addAssignment('age_range', profile.ageRange)
     if (profile.affiliation !== undefined) addAssignment('affiliation', profile.affiliation)
     if (profile.bio !== undefined) addAssignment('bio', profile.bio)
+    if (profile.preferredCategories !== undefined) {
+      addAssignment('preferred_categories', [...new Set(profile.preferredCategories)])
+    }
     assignments.push('updated_at = NOW()')
     values.push(userId)
 
@@ -155,9 +116,6 @@ export async function updateProfile(
     if (updated.rowCount === 0) {
       await client.query('ROLLBACK')
       return undefined
-    }
-    if (categoryIds !== undefined) {
-      await replaceCategoryPreferences(client, userId, categoryIds)
     }
     const savedProfile = await queryProfile(client, userId)
     if (!savedProfile) throw new Error('Profile was not returned after update')
