@@ -43,7 +43,7 @@ function useEventStoreValue() {
     const token = await writeToken()
     const { title, description, startsAt, endsAt, locationName, city, address, latitude, longitude, categoryNames, priceAmount, notes } = event
     const saved = await eventApi.save({
-      title, description, startsAt, endsAt, locationName, city, latitude, longitude, categoryNames, priceAmount,
+      title, description, startsAt, endsAt: id ? endsAt ?? null : endsAt, locationName, city, latitude, longitude, categoryNames, priceAmount,
       address: address?.trim() || (id ? null : undefined),
       notes: notes?.trim() || (id ? null : undefined),
     }, token, id)
