@@ -17,7 +17,9 @@ const { httpServer, close } = createChatServer({
 })
 
 httpServer.listen(port, host, () => {
-  console.info(`Chat/notification service listening on http://${host}:${port} (PostgreSQL chats and notifications)`)
+  const address = httpServer.address()
+  const listeningPort = typeof address === 'object' && address ? address.port : port
+  console.info(`Chat/notification service listening on http://${host}:${listeningPort} (PostgreSQL chats and notifications)`)
 })
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

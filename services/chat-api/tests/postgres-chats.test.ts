@@ -275,7 +275,7 @@ describe('PostgreSQL chat persistence', { skip: !process.env.TEST_DATABASE_URL, 
       await flushed
       assert.deepEqual(observed, [])
       assert.equal((await database.query('SELECT COUNT(*)::int AS count FROM messages')).rows[0].count, 0)
-      assert.equal((await database.query("SELECT COUNT(*)::int AS count FROM event_participations WHERE event_id = $1 AND user_id = 'demo-cathy' AND status = 'withdrawn'", [eventId])).rows[0].count, 1)
+      assert.equal((await database.query("SELECT COUNT(*)::int AS count FROM event_participations WHERE event_id = $1 AND user_id = 'demo-cathy' AND status = 'interested'", [eventId])).rows[0].count, 1)
     } finally {
       await database.query('DROP TRIGGER reject_chat_commit ON messages; DROP FUNCTION reject_chat_commit()')
     }
