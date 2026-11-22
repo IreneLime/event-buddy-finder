@@ -47,6 +47,12 @@ to hard-coded chat fixtures. For Firebase locally, run `CHAT_DEV_MODE=false pnpm
   re-enrolls a withdrawn user.
 - Restarting chat preserves event membership and stable conversation IDs, while
   messages and direct conversations persist in PostgreSQL.
+- The consolidated schema stores each direct chat's ordered pair in the two
+  participant columns on `conversations`; event-chat membership is always
+  derived from the event owner and current RSVP. Messages do not depend on a
+  membership table, so leaving an event chat revokes access without deleting
+  message history. Foreign keys restrict hard deletion of accounts referenced
+  by chat history.
 
 ## API
 

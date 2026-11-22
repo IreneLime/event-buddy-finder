@@ -30,6 +30,8 @@ commands skip the database suites when it is absent.
 | Verify permission before saving | `services/chat-api/tests/chat-service.test.ts`, `realtime-chat.test.ts`, `event-membership.test.ts` | Rejected messages leave history unchanged; withdrawal revokes existing sockets; database authority failures fail closed |
 | Real-time group and direct messages | `services/chat-api/tests/realtime-chat.test.ts` | Actual WebSockets deliver to sender and recipient tabs; group attendees and unrelated users receive only authorized messages |
 | Update chat without refreshing the page | `apps/web/tests/chat-session.test.tsx` | An incoming message renders with history requests disabled, keeps the mounted transcript and unsent draft, and deduplicates repeat delivery |
+| Update chat previews without per-message list queries | `apps/web/tests/chat-session.test.tsx` | With 25 additional event chats, known incoming/outgoing messages update and sort previews without list/inbox requests; duplicate, older, tied-timestamp, and delayed-list responses preserve the latest preview; unknown chats, membership changes, and reconnects fetch authoritative lists |
+| Serialize first organizer withdrawal with sends | `services/chat-api/tests/event-membership.test.ts` | The actual RSVP HTTP endpoint acquires the event advisory lock before its first withdrawal insert; concurrent recipient/sender socket sends are observed waiting via PostgreSQL lock state, then exclude or reject the organizer after withdrawal commits |
 | Previous conversations available on return | `postgres-chats.test.ts`, `realtime-chat.test.ts`, `apps/web/tests/chat-session.test.tsx` | Actual server process restarts preserve group/DM history, membership, IDs, and summaries; reconnects recover missed messages |
 | Save messages in PostgreSQL before broadcasting | `services/chat-api/tests/postgres-chats.test.ts` | Saved database rows match delivered messages; a deferred COMMIT failure returns an error, rolls back sender membership/message inserts, and emits nothing |
 | Durable direct chats and history pagination | `services/chat-api/tests/postgres-chats.test.ts` | Concurrent reverse requests reuse one DM; timestamp ties paginate without overlap; cross-conversation cursors are rejected |
@@ -48,6 +50,9 @@ connection to wait for earlier packets, avoiding arbitrary sleeps.
 Normal startup uses `PostgresChats` with the existing tables from migrations
 001–003. `MemoryChatStore` remains an isolated unit/demo fixture. No new schema
 migration is needed, and a database failure never falls back to memory.
+The final-submission path keeps `conversation_members` and migrations 001–003;
+see [schema consolidation integration order](../database/README.md#chat-persistence-and-schema-consolidation)
+before combining this adapter with #15.
 
 `postgres-chats.test.ts` starts the actual `src/index.ts` in a child process,
 sends group/direct messages, checks the database, terminates that process, and
