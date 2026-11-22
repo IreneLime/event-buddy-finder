@@ -22,3 +22,10 @@ Each numbered item has one owner and a concrete acceptance check. Assignments fo
 | 16 | **Record and link the final demo.** Capture the event-cover upload, second-user RSVP, live chat, and an event alert. | Cathy | Web, Firebase Auth, events-api, image-api, chat-api, DigitalOcean Spaces | The README’s `## Video Demo` links to a grader-accessible, 2–5 minute video narrated by the team. |
 
 [Course final deliverable requirements](https://www.eecg.utoronto.ca/~cying/courses/ece1724-web/project/handout/#final-project-deliverable)
+
+## Cathy-owned submission items
+
+- **13 — Verification:** GitHub Actions runs a clean checkout through build, typecheck, PostgreSQL-backed service tests, and the Chromium end-to-end flow. The build and typecheck jobs were added with this PR; completion depends on their CI result.
+- **14 — README:** The root README now links the architecture, setup guide, database documentation, user workflow, and all five service API references.
+- **15 — AI record:** [`ai-session.md`](../ai-session.md) records selected real Codex-assisted work and states which live cloud checks have not run.
+- **16 — Video demo:** Still open. The team must record and link a grader-accessible, narrated 2–5 minute demo; the README lists the expected flow.
