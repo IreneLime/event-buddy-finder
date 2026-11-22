@@ -21,7 +21,7 @@ const desktopAlert = vi.fn()
 
 class FakeNotification {
   static permission: NotificationPermission = 'default'
-  static requestPermission = vi.fn(async () => { FakeNotification.permission = 'granted'; return 'granted' as const })
+  static requestPermission = vi.fn(async (): Promise<NotificationPermission> => { FakeNotification.permission = 'granted'; return 'granted' })
   onclick: (() => void) | null = null
   constructor(title: string, options: NotificationOptions) { desktopAlert(title, options) }
   close() {}
@@ -65,7 +65,7 @@ afterAll(async () => {
 
 function Controls() {
   const { signIn } = auth.useAuth()
-  return <button onClick={() => signIn('mina@example.test', 'demo1234')}>Switch to Mina</button>
+  return <button onClick={() => signIn('mina@example.test', '123')}>Switch to Mina</button>
 }
 function Probe() { session = context.useChatStore(); return null }
 function EventTarget() { return <h1>Event {useParams().eventId} opened</h1> }
@@ -153,4 +153,38 @@ it('requests browser permission only on an explicit click and keeps the preferen
   fireEvent.click(screen.getByRole('button', { name: 'Switch to Mina' }))
   await screen.findByRole('button', { name: 'Enable browser alerts' })
   expect(session.browserAlertsEnabled).toBe(false)
+})
+
+it('recovers offline cancellation alerts on socket reconnect without remounting the page', async () => {
+  await mount()
+  const heading = screen.getByRole('heading', { name: 'Notifications', level: 1 })
+  const socket = session.socket
+  await act(async () => { socket.disconnect() })
+  await waitFor(() => {
+    expect(session.connected).toBe(false)
+    expect(server.io.sockets.sockets.size).toBe(0)
+  })
+  const alert = await update('Cancelled while disconnected', 'event_cancelled')
+  expect(session.notifications).toEqual([])
+  await act(async () => { socket.connect() })
+  await waitFor(() => {
+    expect(session.connected).toBe(true)
+    expect(session.notifications.map((item) => item.id)).toContain(alert.id)
+    expect(session.unreadCount).toBe(1)
+  })
+  expect(screen.getByRole('heading', { name: 'Notifications', level: 1 })).toBe(heading)
+  expect(session.liveAlerts).toEqual([])
+  expect(desktopAlert).not.toHaveBeenCalled()
+})
+
+it('keeps in-app cancellation alerts working when browser permission is denied', async () => {
+  FakeNotification.permission = 'denied'
+  FakeNotification.requestPermission.mockResolvedValueOnce('denied')
+  await mount()
+  await act(async () => { await session.setBrowserAlerts(true) })
+  expect(session.browserAlertsEnabled).toBe(false)
+  const alert = await update('Cancellation with browser alerts denied', 'event_cancelled')
+  await within(screen.getByRole('region', { name: 'Live event alerts' })).findByText(alert.message)
+  await screen.findByRole('button', { name: 'Notifications, 1 unread' })
+  expect(desktopAlert).not.toHaveBeenCalled()
 })

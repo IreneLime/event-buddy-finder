@@ -1,41 +1,99 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router'
-import { demoUsers, type DemoUser } from '../data/demo-users'
+import { createUserWithEmailAndPassword, onIdTokenChanged, reload, sendEmailVerification, signInWithEmailAndPassword, signOut as firebaseSignOut, type User } from 'firebase/auth'
+import { demoUsers } from '../data/demo-users'
+import { firebaseAuth } from '../lib/firebase'
+
+interface Account {
+  id: string
+  displayName: string
+  emailVerified: boolean
+}
 
 interface AuthStoreValue {
-  user: DemoUser | null
-  signIn: (email: string, password: string) => boolean
-  signOut: () => void
+  user: Account | null
+  loading: boolean
+  live: boolean
+  getToken: () => Promise<string | undefined>
+  signIn: (email: string, password: string) => Promise<void>
+  signOut: () => Promise<void>
+  register: (email: string, password: string) => Promise<void>
+  sendVerification: () => Promise<void>
+  refreshVerification: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthStoreValue | null>(null)
 const storageKey = 'event-buddy-demo-user'
 
-function readStoredUser() {
+function account(user: User | null): Account | null {
+  return user && { id: user.uid, displayName: user.displayName || user.email?.split('@')[0] || 'Member', emailVerified: user.emailVerified }
+}
+
+function readStoredUser(): Account | null {
+  if (firebaseAuth) return null
   try {
-    const userId = window.localStorage.getItem(storageKey)
-    return demoUsers.find((user) => user.id === userId) ?? null
+    const user = demoUsers.find(({ id }) => id === window.localStorage.getItem(storageKey))
+    return user ? { id: user.id, displayName: user.displayName, emailVerified: true } : null
   } catch {
     return null
   }
 }
 
+async function getToken() {
+  return firebaseAuth?.currentUser?.getIdToken()
+}
+
+function currentFirebaseUser() {
+  const user = firebaseAuth?.currentUser
+  if (!user) throw new Error('Please sign in to continue.')
+  return user
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<DemoUser | null>(readStoredUser)
-  const value = useMemo<AuthStoreValue>(() => ({
-    user,
-    signIn: (email, password) => {
+  const [user, setUser] = useState(readStoredUser)
+  const [loading, setLoading] = useState(Boolean(firebaseAuth))
+
+  useEffect(() => {
+    if (!firebaseAuth) return
+    return onIdTokenChanged(firebaseAuth, (current) => {
+      setUser(account(current))
+      setLoading(false)
+    })
+  }, [])
+
+  const value: AuthStoreValue = {
+    user, loading, live: Boolean(firebaseAuth), getToken,
+    signIn: async (email, password) => {
+      if (firebaseAuth) {
+        const { user } = await signInWithEmailAndPassword(firebaseAuth, email.trim(), password)
+        setUser(account(user))
+        return
+      }
       const found = demoUsers.find((candidate) => candidate.email.toLowerCase() === email.trim().toLowerCase() && candidate.demoPassword === password)
-      if (!found) return false
-      setUser(found)
+      if (!found) throw new Error('That demo email and password do not match.')
       window.localStorage.setItem(storageKey, found.id)
-      return true
+      setUser({ id: found.id, displayName: found.displayName, emailVerified: true })
     },
-    signOut: () => {
+    signOut: async () => {
+      if (firebaseAuth) await firebaseSignOut(firebaseAuth)
+      else window.localStorage.removeItem(storageKey)
       setUser(null)
-      window.localStorage.removeItem(storageKey)
     },
-  }), [user])
+    register: async (email, password) => {
+      if (!firebaseAuth) throw new Error('Firebase is not configured.')
+      const { user } = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password)
+      setUser(account(user))
+      await sendEmailVerification(user)
+    },
+    sendVerification: () => sendEmailVerification(currentFirebaseUser()),
+    refreshVerification: async () => {
+      const current = currentFirebaseUser()
+      await reload(current)
+      await current.getIdToken(true)
+      setUser(account(current))
+      return current.emailVerified
+    },
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
@@ -47,8 +105,9 @@ export function useAuth() {
 }
 
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const location = useLocation()
+  if (loading) return <p role="status" className="p-8">Checking your session…</p>
   if (!user) return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />
   return children
 }

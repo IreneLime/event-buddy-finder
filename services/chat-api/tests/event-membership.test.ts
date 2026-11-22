@@ -13,6 +13,7 @@ import { io, type Socket } from 'socket.io-client'
 import type { ChatResult, ConversationDetail, ConversationMessage } from '@event-buddy/contracts'
 import { createChatServer } from '../src/app.js'
 import { PostgresEventMembership } from '../src/event-membership.js'
+import { PostgresChats } from '../src/postgres-chats.js'
 
 if (process.env.REQUIRE_EVENT_MEMBERSHIP_TESTS === 'true' && !process.env.TEST_DATABASE_URL) {
   throw new Error('Set TEST_DATABASE_URL to run the real events API membership regression.')
@@ -37,8 +38,9 @@ describe('events API owns event-chat membership', {
   const host = `new-host-${process.pid}`
   const guest = `new-guest-${process.pid}`
 
-  async function startChat() {
-    chat = createChatServer({ devMode: true, eventMembership: new PostgresEventMembership(databaseUrl, true) })
+  async function startChat(persistent = false) {
+    chat = createChatServer({ devMode: true, eventMembership: new PostgresEventMembership(databaseUrl, true),
+      chats: persistent ? new PostgresChats(databaseUrl, true) : undefined })
     chat.httpServer.listen(0, '127.0.0.1')
     await once(chat.httpServer, 'listening')
     chatOrigin = `http://127.0.0.1:${(chat.httpServer.address() as AddressInfo).port}`
@@ -190,4 +192,77 @@ describe('events API owns event-chat membership', {
     assert.deepEqual((await restored.json()).messages.items, [], 'Failed authority lookups must not save messages')
     socket.disconnect()
   })
+
+  async function waitForBlockedBy(pid: number) {
+    const deadline = Date.now() + 3_000
+    while (Date.now() < deadline) {
+      const result = await database!.query<{ pid: number }>(`SELECT pid FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event = 'advisory'
+          AND $1::int = ANY(pg_blocking_pids(pid))`, [pid])
+      if (result.rowCount) return result.rows[0].pid
+      await delay(10)
+    }
+    assert.fail(`Expected a transaction to wait for advisory lock holder ${pid}`)
+  }
+
+  for (const sender of ['guest', 'organizer'] as const) {
+    test(`first organizer withdrawal locks before a concurrent ${sender} send`, { timeout: 15_000 }, async () => {
+      await chat!.close()
+      await startChat(true)
+      const event = await createEvent()
+      await eventApi(`/events/${event.id}/participation`, guest, 'PUT', { status: 'interested' })
+      const conversation: ConversationDetail = await (await chatApi(`/events/${event.id}/conversation`)).json()
+      const organizer = await connect(host)
+      const attendee = await connect(guest)
+      const observed: ConversationMessage[] = []
+      organizer.on('message:created', (message) => observed.push(message))
+
+      // Pause the real RSVP endpoint inside its first INSERT, after it has
+      // acquired the event lock but while the organizer still has no RSVP row.
+      const gate = await database!.connect()
+      let withdrawal: Promise<unknown> | undefined
+      let sending: ReturnType<typeof send> | undefined
+      try {
+        await gate.query('BEGIN')
+        await gate.query("SELECT pg_advisory_xact_lock(hashtextextended('test-rsvp-gate', 0))")
+        const gatePid = (await gate.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid
+        await database!.query(`CREATE FUNCTION pause_first_withdrawal() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+          BEGIN PERFORM pg_advisory_xact_lock(hashtextextended('test-rsvp-gate', 0)); RETURN NEW; END $$;
+          CREATE TRIGGER pause_first_withdrawal BEFORE INSERT ON event_participations
+          FOR EACH ROW WHEN (NEW.status = 'withdrawn') EXECUTE FUNCTION pause_first_withdrawal()`)
+        withdrawal = eventApi(`/events/${event.id}/participation`, host, 'PUT', { status: 'withdrawn' })
+        const withdrawalPid = await waitForBlockedBy(gatePid)
+        assert.equal((await database!.query('SELECT 1 FROM event_participations WHERE event_id = $1 AND user_id = $2',
+          [conversation.id.slice('event-'.length), `demo-${host}`])).rowCount, 0)
+
+        sending = send(sender === 'guest' ? attendee : organizer, conversation.id, 'Concurrent with first withdrawal')
+        await waitForBlockedBy(withdrawalPid)
+        await gate.query('COMMIT')
+        await withdrawal
+        const result = await sending
+        if (sender === 'guest') {
+          assert.equal(result.ok, true)
+          const history = await (await chatApi(`/conversations/${conversation.id}/messages`, guest)).json()
+          assert.deepEqual(history.items.map((message: ConversationMessage) => message.body), ['Concurrent with first withdrawal'])
+        } else {
+          assert.equal(result.ok, false)
+          if (!result.ok) assert.equal(result.error.code, 'FORBIDDEN')
+          const history = await (await chatApi(`/conversations/${conversation.id}/messages`, guest)).json()
+          assert.deepEqual(history.items, [])
+        }
+        const flushed = once(organizer, 'conversations:changed', { signal: AbortSignal.timeout(3_000) })
+        chat!.io.to(organizer.id!).emit('conversations:changed')
+        await flushed
+        assert.deepEqual(observed, [], 'The withdrawn organizer must not receive the concurrent message')
+        assert.equal((await chatApi(`/GetGroupChat/${conversation.id}`)).status, 403)
+      } finally {
+        await gate.query('ROLLBACK')
+        gate.release()
+        await Promise.allSettled([withdrawal, sending])
+        await database!.query('DROP TRIGGER IF EXISTS pause_first_withdrawal ON event_participations; DROP FUNCTION IF EXISTS pause_first_withdrawal()')
+        organizer.disconnect()
+        attendee.disconnect()
+      }
+    })
+  }
 })

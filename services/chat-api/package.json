@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "CHAT_DEV_MODE=true tsx watch src/index.ts",
+    "dev": "CHAT_DEV_MODE=${CHAT_DEV_MODE:-true} tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "test:membership": "REQUIRE_EVENT_MEMBERSHIP_TESTS=true tsx --test tests/event-membership.test.ts"
+    "test:membership": "REQUIRE_EVENT_MEMBERSHIP_TESTS=true tsx --test tests/event-membership.test.ts",
+    "test:persistence": "REQUIRE_CHAT_PERSISTENCE_TESTS=true tsx --test tests/postgres-chats.test.ts"
   },
   "dependencies": {
     "@event-buddy/contracts": "workspace:*",

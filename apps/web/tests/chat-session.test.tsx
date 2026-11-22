@@ -4,12 +4,8 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createChatServer } from '../../../services/chat-api/src/app'
 import { createDemoStore } from '../../../services/chat-api/src/seed'
+import type { ConversationMessage } from '@event-buddy/contracts'
 import type { ChatState } from '../src/state/chat-context'
-
-vi.mock('../src/lib/events-api', async () => {
-  const { starterEvents } = await import('../src/data/mock-events')
-  return { createEventsApi: () => ({ list: async () => starterEvents }) }
-})
 
 const server = createChatServer({ devMode: true })
 let auth: typeof import('../src/state/auth-store')
@@ -58,7 +54,7 @@ function connectedUsers() {
 function AccountControls() {
   const { signIn, signOut } = auth.useAuth()
   return <>
-    {['cathy', 'mina', 'alex', 'nadia'].map((id) => <button key={id} onClick={() => signIn(`${id}@example.test`, 'demo1234')}>Log in as {id}</button>)}
+    {['cathy', 'mina', 'alex', 'nadia'].map((id) => <button key={id} onClick={() => signIn(`${id}@example.test`, '123')}>Log in as {id}</button>)}
     <button onClick={signOut}>Log out</button>
   </>
 }
@@ -68,14 +64,14 @@ function SessionProbe() {
   return <button onClick={() => void session.refresh()}>Refresh chat</button>
 }
 
-function mountPage(detail = false) {
+function mountPage(detail = false, conversationId = 'mina-dm') {
   const { AuthProvider } = auth
   const { ChatStoreProvider } = chat
   const { EventStoreProvider } = events
   const { ChatPage, ChatsPage } = pages
   render(<StrictMode><AuthProvider>
     <AccountControls />
-    <EventStoreProvider><MemoryRouter initialEntries={['/chats/mina-dm']}>
+    <EventStoreProvider><MemoryRouter initialEntries={[`/chats/${conversationId}`]}>
       <ChatStoreProvider><SessionProbe /><Routes>
         <Route path="/chats/:conversationId" element={detail ? <ChatPage /> : <ChatsPage />} />
       </Routes></ChatStoreProvider>
@@ -103,7 +99,130 @@ async function waitForMessage(body: string) {
   return within(log).findByText(body)
 }
 
+async function deliver(message: ConversationMessage) {
+  await act(async () => {
+    const received = new Promise<void>((resolve) => session.socket.once('message:created', () => resolve()))
+    server.io.to('user:cathy').emit('message:created', message)
+    await received
+  })
+}
+
 describe('chat follows the signed-in account', () => {
+  it('updates and sorts known chat previews without fetching the list or inbox, including duplicate and older deliveries', async () => {
+    for (let index = 0; index < 25; index++) server.service.CreateGroupChat(`preview-event-${index}`, `Event ${index}`, 'cathy')
+    mountPage()
+    await logIn('cathy')
+    expect(session.conversations.length).toBeGreaterThanOrEqual(25)
+    const list = vi.spyOn(session.api, 'ListGroupChats').mockRejectedValue(new Error('Known messages must not reload the chat list'))
+    const inbox = vi.spyOn(session.api, 'notifications').mockRejectedValue(new Error('Chat messages must not reload the inbox'))
+    const previous = session.conversations.find((item) => item.id === 'chat-night-market')!.lastMessage!
+    const incoming = server.service.send('chat-night-market', 'mina', 'New preview from Mina')
+    incoming.id = '8'
+    await deliver(incoming)
+    expect(session.conversations[0].id).toBe(incoming.conversationId)
+    expect(session.conversations[0].lastMessage).toEqual(incoming)
+    await deliver(incoming)
+    await deliver(previous)
+    expect(session.conversations[0].lastMessage).toEqual(incoming)
+    // PostgreSQL timestamps are exposed with millisecond precision; numeric IDs
+    // break ties so a delayed packet cannot replace a later message's preview.
+    await deliver({ ...incoming, id: '10', body: 'Later tied message' })
+    await deliver({ ...incoming, id: '9', body: 'Earlier tied message' })
+    expect(session.conversations[0].lastMessage?.body).toBe('Later tied message')
+    await act(async () => { await client.sendChatMessage(session.socket, 'mina-dm', 'My own live preview') })
+    await waitFor(() => expect(session.conversations[0].lastMessage?.body).toBe('My own live preview'))
+    expect(list).not.toHaveBeenCalled()
+    expect(inbox).not.toHaveBeenCalled()
+  })
+
+  it('fetches the list for an unknown chat and removes withdrawn chats on membership changes', async () => {
+    mountPage()
+    await logIn('cathy')
+    const list = vi.spyOn(session.api, 'ListGroupChats')
+    list.mockResolvedValueOnce({ items: session.conversations.filter((item) => item.id !== 'chat-night-market') })
+    await act(async () => { await session.refresh() })
+    expect(session.conversations.some((item) => item.id === 'chat-night-market')).toBe(false)
+    list.mockClear()
+    const incoming = server.service.send('chat-night-market', 'mina', 'Discover this chat')
+    await deliver(incoming)
+    await waitFor(() => expect(session.conversations.find((item) => item.id === incoming.conversationId)?.lastMessage).toEqual(incoming))
+    expect(list).toHaveBeenCalledTimes(1)
+
+    list.mockClear()
+    server.service.participate('night-market', 'cathy', 'withdrawn')
+    await act(async () => { server.io.to('user:cathy').emit('conversations:changed') })
+    await waitFor(() => expect(session.conversations.some((item) => item.id === incoming.conversationId)).toBe(false))
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a live preview when an older list response finishes afterward', async () => {
+    mountPage()
+    await logIn('cathy')
+    const snapshot = await session.api.ListGroupChats()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    vi.spyOn(session.api, 'ListGroupChats').mockImplementationOnce(async () => { await gate; return snapshot })
+    const refreshing = session.refresh()
+    try {
+      const incoming = server.service.send('chat-night-market', 'mina', 'Newer than the list snapshot')
+      await deliver(incoming)
+      expect(session.conversations[0].lastMessage).toEqual(incoming)
+      await act(async () => { release(); await refreshing })
+      expect(session.conversations[0].lastMessage).toEqual(incoming)
+    } finally { await act(async () => { release(); await refreshing }) }
+  })
+
+  for (const conversationId of ['mina-dm', 'chat-night-market']) {
+    it(`${conversationId}: renders another user's live messages without reloading history or losing the draft`, async () => {
+      mountPage(true, conversationId)
+      await logIn('cathy')
+      const transcript = await screen.findByRole('log', { name: 'Conversation messages' })
+      const composer = screen.getByRole('textbox', { name: 'Write a message' })
+      fireEvent.change(composer, { target: { value: 'My unsent plan' } })
+      const history = vi.spyOn(session.api, 'GetGroupChat').mockRejectedValue(new Error('Live messages must arrive through the socket'))
+      const peer = client.createChatSocket('mina')
+      try {
+        peer.connect()
+        await waitFor(() => expect(peer.connected).toBe(true))
+        const unrelatedId = conversationId === 'mina-dm' ? 'chat-night-market' : 'mina-dm'
+        await act(async () => { await client.sendChatMessage(peer, unrelatedId, 'A different conversation') })
+        let sent!: Awaited<ReturnType<typeof client.sendChatMessage>>
+        await act(async () => { sent = await client.sendChatMessage(peer, conversationId, 'Meet me at the entrance') })
+        await within(transcript).findByText('Meet me at the entrance')
+        expect(within(transcript).queryByText('A different conversation')).toBeNull()
+        // Repeat delivery must not render the same message twice.
+        await act(async () => {
+          const received = new Promise<void>((resolve) => session.socket.once('message:created', () => resolve()))
+          server.io.to('user:cathy').emit('message:created', sent)
+          await received
+        })
+        expect(within(transcript).getAllByText(sent.body)).toHaveLength(1)
+        expect(history).not.toHaveBeenCalled()
+        expect(screen.getByRole('log', { name: 'Conversation messages' })).toBe(transcript)
+        expect(screen.getByRole('textbox', { name: 'Write a message' })).toBe(composer)
+        expect(composer).toHaveProperty('value', 'My unsent plan')
+      } finally { peer.disconnect() }
+    })
+  }
+
+  it('reloads missed chat history on socket reconnect while keeping the same page open', async () => {
+    mountPage(true)
+    await logIn('cathy')
+    const transcript = await screen.findByRole('log', { name: 'Conversation messages' })
+    const socket = session.socket
+    const list = vi.spyOn(session.api, 'ListGroupChats')
+    await act(async () => { socket.disconnect() })
+    await waitFor(() => expect(session.connected).toBe(false))
+    const message = server.service.send('mina-dm', 'mina', 'Sent while Cathy was offline')
+    expect(within(transcript).queryByText(message.body)).toBeNull()
+    await act(async () => { socket.connect() })
+    await within(transcript).findByText(message.body)
+    await waitFor(() => expect(session.conversations[0].lastMessage).toEqual(message))
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(session.socket).toBe(socket)
+    expect(screen.getByRole('log', { name: 'Conversation messages' })).toBe(transcript)
+  })
+
   it('uses the saved Mina login immediately after a page reload', async () => {
     server.service.send('mina-dm', 'cathy', 'Previously sent by Cathy')
     window.localStorage.setItem('event-buddy-demo-user', 'mina')
