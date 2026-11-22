@@ -54,7 +54,23 @@ const profilePath = (id: string) => `/users/${encodeURIComponent(id)}`
 const eventPath = (id: string) => `/events/${encodeURIComponent(id)}`
 
 export const profileApi = {
-  get: (id: string, signal?: AbortSignal) => request<UserProfile>(usersApiUrl, profilePath(id), { signal }),
+  get: async (id: string, signal?: AbortSignal): Promise<UserProfile> => {
+    try {
+      return await request<UserProfile>(usersApiUrl, profilePath(id), { signal })
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404 && !id.startsWith('demo-')) {
+        try {
+          return await request<UserProfile>(usersApiUrl, profilePath(`demo-${id}`), { signal })
+        } catch (aliasError) {
+          if (!(aliasError instanceof ApiError && aliasError.status === 404)) throw aliasError
+        }
+      }
+      if (error instanceof Error && error.message === 'Could not reach the service. Please try again.') {
+        throw new Error('Could not reach the user profile service. Start it with `pnpm dev:users`, then try again.')
+      }
+      throw error
+    }
+  },
   mine: (token: string, signal?: AbortSignal) => request<CurrentUserProfile>(usersApiUrl, '/me/profile', { token, signal }),
   save: (token: string, body: CreateProfileRequest | UpdateProfileRequest, create: boolean) =>
     request<CurrentUserProfile>(usersApiUrl, '/me/profile', { token, method: create ? 'POST' : 'PATCH', body }),

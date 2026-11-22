@@ -4,11 +4,13 @@ React and TypeScript SPA using Vite, React Router, Tailwind CSS, and shared UI c
 
 ## Run the demo
 
-Run `pnpm install` and `pnpm dev:web` from the repo root. With Firebase and the events API unconfigured, the app uses local demo accounts and events. Chat requires the separately running chat service and a seeded PostgreSQL database; see the API setup below.
+Run `pnpm install` and `pnpm dev:web` from the repo root. With Firebase and the events API unconfigured, the app uses local demo accounts and events.
 
 This frontend-only mode uses `apps/web/src/data/demo-users.ts` and
 `apps/web/src/data/mock-events.ts`; it does not read the PostgreSQL seeds. Use
 the local accounts on the sign-in page (password `123`) to review the prototype.
+Chats and public profiles backed by seeded PostgreSQL data require the separate
+chat and user APIs described below.
 
 ## Connect the APIs
 

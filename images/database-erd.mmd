@@ -1,0 +1,134 @@
+%%{init: {"er": {"fontSize": 12}}}%%
+erDiagram
+    APP_USERS ||--o{ USER_CATEGORY_PREFERENCES : selects
+    CATEGORIES ||--o{ USER_CATEGORY_PREFERENCES : "selected by"
+    APP_USERS ||--o{ GROUPS : creates
+    APP_USERS ||--o{ GROUP_MEMBERS : "belongs to"
+    GROUPS ||--o{ GROUP_MEMBERS : has
+    APP_USERS ||--o{ EVENTS : creates
+    GROUPS |o--o{ EVENTS : "optionally organizes"
+    EVENTS ||--o{ EVENT_CATEGORIES : "tagged as"
+    CATEGORIES ||--o{ EVENT_CATEGORIES : categorizes
+    EVENTS ||--o{ EVENT_PARTICIPATIONS : has
+    APP_USERS ||--o{ EVENT_PARTICIPATIONS : participates
+    EVENTS |o--o| CONVERSATIONS : "optionally has group chat"
+    CONVERSATIONS ||--o{ CONVERSATION_MEMBERS : has
+    APP_USERS ||--o{ CONVERSATION_MEMBERS : joins
+    CONVERSATION_MEMBERS ||--o{ MESSAGES : sends
+    APP_USERS ||--o{ NOTIFICATIONS : receives
+    APP_USERS |o--o{ NOTIFICATIONS : triggers
+    EVENTS |o--o{ NOTIFICATIONS : concerns
+    NOTIFICATIONS ||--o| NOTIFICATION_OUTBOX : queues
+
+    APP_USERS {
+        string firebase_uid PK "Firebase Auth UID"
+        string email UK
+        string display_name
+        string age_range "nullable enum"
+        string affiliation "nullable, e.g. school"
+        string bio
+        string profile_image_key "Spaces object key"
+        timestamp profile_completed_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    CATEGORIES {
+        bigint id PK
+        string name UK
+    }
+
+    USER_CATEGORY_PREFERENCES {
+        string user_id PK, FK
+        bigint category_id PK, FK
+    }
+
+    GROUPS {
+        bigint id PK
+        string name
+        string description
+        string created_by_user_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    GROUP_MEMBERS {
+        bigint group_id PK, FK
+        string user_id PK, FK
+        string role "organizer or member"
+        timestamp joined_at
+    }
+
+    EVENTS {
+        bigint id PK
+        string public_id UK
+        string created_by_user_id FK
+        bigint organizing_group_id FK "nullable"
+        string title
+        string description
+        string notes
+        timestamp starts_at
+        timestamp ends_at
+        string location_name
+        string city
+        string address
+        decimal latitude
+        decimal longitude
+        decimal price_amount
+        int capacity
+        string image_object_key "Spaces object key"
+        string status "scheduled or cancelled"
+        timestamp cancelled_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    EVENT_CATEGORIES {
+        bigint event_id PK, FK
+        bigint category_id PK, FK
+    }
+
+    EVENT_PARTICIPATIONS {
+        bigint event_id PK, FK
+        string user_id PK, FK
+        string status "interested, going, withdrawn"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    CONVERSATIONS {
+        bigint id PK
+        string kind "event or direct"
+        bigint event_id FK "unique, nullable"
+        timestamp created_at
+    }
+
+    CONVERSATION_MEMBERS {
+        bigint conversation_id PK, FK
+        string user_id PK, FK
+        timestamp joined_at
+    }
+
+    MESSAGES {
+        bigint id PK
+        bigint conversation_id FK
+        string sender_user_id FK
+        string body
+        timestamp created_at
+    }
+
+    NOTIFICATIONS {
+        bigint id PK
+        string recipient_user_id FK
+        string actor_user_id FK "nullable"
+        bigint event_id FK "nullable"
+        string kind "event_updated or event_cancelled"
+        string message
+        timestamp created_at
+        timestamp read_at
+    }
+
+    NOTIFICATION_OUTBOX {
+        bigint notification_id PK, FK
+        timestamp published_at
+    }
