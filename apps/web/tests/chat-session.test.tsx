@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createChatServer } from '../../../services/chat-api/src/app'
 import { createDemoStore } from '../../../services/chat-api/src/seed'
+import type { ConversationMessage } from '@event-buddy/contracts'
 import type { ChatState } from '../src/state/chat-context'
 
 vi.mock('../src/lib/events-api', async () => {
@@ -103,7 +104,79 @@ async function waitForMessage(body: string) {
   return within(log).findByText(body)
 }
 
+async function deliver(message: ConversationMessage) {
+  await act(async () => {
+    const received = new Promise<void>((resolve) => session.socket.once('message:created', () => resolve()))
+    server.io.to('user:cathy').emit('message:created', message)
+    await received
+  })
+}
+
 describe('chat follows the signed-in account', () => {
+  it('updates and sorts known chat previews without fetching the list or inbox, including duplicate and older deliveries', async () => {
+    for (let index = 0; index < 25; index++) server.service.CreateGroupChat(`preview-event-${index}`, `Event ${index}`, 'cathy')
+    mountPage()
+    await logIn('cathy')
+    expect(session.conversations.length).toBeGreaterThanOrEqual(25)
+    const list = vi.spyOn(session.api, 'ListGroupChats').mockRejectedValue(new Error('Known messages must not reload the chat list'))
+    const inbox = vi.spyOn(session.api, 'notifications').mockRejectedValue(new Error('Chat messages must not reload the inbox'))
+    const previous = session.conversations.find((item) => item.id === 'chat-night-market')!.lastMessage!
+    const incoming = server.service.send('chat-night-market', 'mina', 'New preview from Mina')
+    incoming.id = '8'
+    await deliver(incoming)
+    expect(session.conversations[0].id).toBe(incoming.conversationId)
+    expect(session.conversations[0].lastMessage).toEqual(incoming)
+    await deliver(incoming)
+    await deliver(previous)
+    expect(session.conversations[0].lastMessage).toEqual(incoming)
+    // PostgreSQL timestamps are exposed with millisecond precision; numeric IDs
+    // break ties so a delayed packet cannot replace a later message's preview.
+    await deliver({ ...incoming, id: '10', body: 'Later tied message' })
+    await deliver({ ...incoming, id: '9', body: 'Earlier tied message' })
+    expect(session.conversations[0].lastMessage?.body).toBe('Later tied message')
+    await act(async () => { await client.sendChatMessage(session.socket, 'mina-dm', 'My own live preview') })
+    await waitFor(() => expect(session.conversations[0].lastMessage?.body).toBe('My own live preview'))
+    expect(list).not.toHaveBeenCalled()
+    expect(inbox).not.toHaveBeenCalled()
+  })
+
+  it('fetches the list for an unknown chat and removes withdrawn chats on membership changes', async () => {
+    mountPage()
+    await logIn('cathy')
+    const list = vi.spyOn(session.api, 'ListGroupChats')
+    list.mockResolvedValueOnce({ items: session.conversations.filter((item) => item.id !== 'chat-night-market') })
+    await act(async () => { await session.refresh() })
+    expect(session.conversations.some((item) => item.id === 'chat-night-market')).toBe(false)
+    list.mockClear()
+    const incoming = server.service.send('chat-night-market', 'mina', 'Discover this chat')
+    await deliver(incoming)
+    await waitFor(() => expect(session.conversations.find((item) => item.id === incoming.conversationId)?.lastMessage).toEqual(incoming))
+    expect(list).toHaveBeenCalledTimes(1)
+
+    list.mockClear()
+    server.service.participate('night-market', 'cathy', 'withdrawn')
+    await act(async () => { server.io.to('user:cathy').emit('conversations:changed') })
+    await waitFor(() => expect(session.conversations.some((item) => item.id === incoming.conversationId)).toBe(false))
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a live preview when an older list response finishes afterward', async () => {
+    mountPage()
+    await logIn('cathy')
+    const snapshot = await session.api.ListGroupChats()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    vi.spyOn(session.api, 'ListGroupChats').mockImplementationOnce(async () => { await gate; return snapshot })
+    const refreshing = session.refresh()
+    try {
+      const incoming = server.service.send('chat-night-market', 'mina', 'Newer than the list snapshot')
+      await deliver(incoming)
+      expect(session.conversations[0].lastMessage).toEqual(incoming)
+      await act(async () => { release(); await refreshing })
+      expect(session.conversations[0].lastMessage).toEqual(incoming)
+    } finally { await act(async () => { release(); await refreshing }) }
+  })
+
   for (const conversationId of ['mina-dm', 'chat-night-market']) {
     it(`${conversationId}: renders another user's live messages without reloading history or losing the draft`, async () => {
       mountPage(true, conversationId)
@@ -142,12 +215,15 @@ describe('chat follows the signed-in account', () => {
     await logIn('cathy')
     const transcript = await screen.findByRole('log', { name: 'Conversation messages' })
     const socket = session.socket
+    const list = vi.spyOn(session.api, 'ListGroupChats')
     await act(async () => { socket.disconnect() })
     await waitFor(() => expect(session.connected).toBe(false))
     const message = server.service.send('mina-dm', 'mina', 'Sent while Cathy was offline')
     expect(within(transcript).queryByText(message.body)).toBeNull()
     await act(async () => { socket.connect() })
     await within(transcript).findByText(message.body)
+    await waitFor(() => expect(session.conversations[0].lastMessage).toEqual(message))
+    expect(list).toHaveBeenCalledTimes(1)
     expect(session.socket).toBe(socket)
     expect(screen.getByRole('log', { name: 'Conversation messages' })).toBe(transcript)
   })

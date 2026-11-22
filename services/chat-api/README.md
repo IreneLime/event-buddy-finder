@@ -44,6 +44,10 @@ to hard-coded chat fixtures. Production uses the verified Firebase UID directly.
 - After a committed withdrawal, REST reads/writes and already connected Socket.IO
   sends are rejected, and subsequent messages are not delivered to that user.
   Already received messages cannot be retracted from a client.
+- Sends and events-api RSVP upserts take the same event-scoped transaction advisory
+  lock before checking or changing membership. This covers the organizer's first
+  withdrawal even without an existing RSVP row. A withdrawal that locks first
+  commits before the waiting send selects its sender and recipients.
 - Failed database lookups return 503 and never fall back to cached permissions.
   All authority reads complete before a message is saved or acknowledged.
 - Joining/leaving from the frontend also writes through events-api. An RSVP update
@@ -89,6 +93,9 @@ source, and persistent chat storage. `/health` reports `storage: postgresql`.
 No new migration is required for chat persistence: migrations 001–003 already
 provide the conversation, membership, and message tables used by this adapter.
 Existing database-seeded group/direct chats and their messages remain readable.
+Keep this schema for the final-submission persistence integration; the separate
+six-table proposal removes `conversation_members` and requires adapting and
+retesting chat before combining it. See [schema integration order](../../database/README.md#chat-persistence-and-schema-consolidation).
 Messages previously held only in an old server's memory cannot be recovered
 after that server has stopped.
 
@@ -98,6 +105,13 @@ saved message or error. The sender comes from the verified socket identity.
 `notifications:changed` update the frontend. Message bodies contain 1–2000
 non-whitespace characters; request bodies are limited to 16 KB. Read receipts are
 not implemented.
+
+For a known chat, the frontend updates `lastMessage` and re-sorts its conversation
+list directly from `message:created`, without refetching the chat list or inbox.
+Duplicate or older deliveries cannot regress the preview, and an in-flight list
+response preserves newer live messages. The server list remains authoritative
+for membership: reconnects, RSVP/event changes, `conversations:changed`, and
+messages for unknown chats refresh it.
 
 ## Verification
 
