@@ -2,6 +2,14 @@
 
 After migrations `001`–`004`, the application stores data in **six PostgreSQL tables**. Migration `004_consolidate_schema.sql` consolidates the original 13-table design while preserving the supported users, events, attendance, chats, messages, and notifications. PostgreSQL stores application records and image object keys; Firebase Authentication stores login identities, and DigitalOcean Spaces stores image bytes.
 
+## Diagrams
+
+The ER diagram shows all six tables, their key fields, and relationships. The overview diagram summarizes the main application concepts and how they connect.
+
+![Consolidated PostgreSQL schema ER diagram](../images/database-erd.png)
+
+![Application data relationship overview](../images/database-overview.png)
+
 ## Tables and relationships
 
 | Table | Primary key | Purpose and relationships |
