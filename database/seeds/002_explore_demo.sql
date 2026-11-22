@@ -32,6 +32,7 @@ CREATE TEMP TABLE explore_demo_events (
 INSERT INTO explore_demo_events VALUES
   ('demo-community-meetup', 'Demo Community Meetup', 'demo-profile-user', 'Toronto', 'Toronto City Hall', 43.6534, -79.3841, 'Community', 0, 3, 'Share a coffee and meet people who are looking for company at local events.', 'Meet near the entrance to Nathan Phillips Square.'),
   ('riverside-photo-walk', 'Riverside Photo Walk', 'demo-cathy', 'Toronto', 'Riverdale Park East', 43.6712, -79.3554, 'Outdoors', 0, 4, 'Take an easy walk with time to photograph the skyline and swap ideas.', 'Meet near the Broadview Avenue entrance. Phones are welcome.'),
+  ('toronto-clay-workshop', 'Beginner Clay & Coffee', 'demo-maya', 'Toronto', 'The Workroom', 43.6650, -79.4100, 'Arts', 18, 6, 'Try a relaxed beginner pottery session, shape a small piece by hand, and meet other people over coffee.', 'All tools and clay are provided. Wear clothes that can get a little dusty.'),
   ('harbourfront-sketchbook', 'Harbourfront Sketchbook Club', 'demo-maya', 'Toronto', 'Harbourfront Centre', 43.6386, -79.3832, 'Arts', 0, 5, 'Bring a sketchbook and spend an hour drawing by the lake with other beginners.', 'Meet in front of the main entrance. Bring pencils and a small sketchbook.'),
   ('kensington-tasting', 'Kensington Market Tasting Walk', 'demo-leila', 'Toronto', 'Kensington Market', 43.6541, -79.4004, 'Food', 0, -6, 'Explore the market at a relaxed pace and stop for snacks along the way.', 'Food is pay as you go. Meet at Baldwin and Augusta.'),
   ('toronto-board-games', 'Wednesday Board Game Table', 'demo-alex', 'Toronto', 'Bloor and Bathurst', 43.6653, -79.4111, 'Games', 8, 7, 'Try two beginner-friendly strategy games with people who can teach the rules.', 'Bring your own game if you like. The fee covers the table.'),
@@ -47,7 +48,7 @@ INSERT INTO explore_demo_events VALUES
   ('richmond-hill-books', 'Richmond Hill Book Swap', 'demo-zoe', 'Richmond Hill', 'Richmond Hill Central Library', 43.8665, -79.4384, 'Community', 0, 17, 'Bring a book to trade and pick up a recommendation from another reader.', 'Meet by the entrance. A book is optional.'),
   ('oakville-trail', 'Oakville Creek Trail Walk', 'demo-milo', 'Oakville', 'Lions Valley Park', 43.4677, -79.7439, 'Outdoors', 0, 18, 'Walk a section of the creek trail at a relaxed pace with breaks for photos.', 'Wear shoes with good grip and bring water.');
 
--- The image seed can be applied independently before this seed.
+-- The image API publisher attaches event-photo object keys after these rows exist.
 UPDATE events SET public_id = 'demo-community-meetup'
 WHERE created_by_user_id = 'demo-profile-user' AND title = 'Demo Community Meetup'
   AND public_id IS NULL
