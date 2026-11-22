@@ -80,7 +80,7 @@ The composite key allows one current RSVP per user/event. The database check ret
 | `participant_one_user_id`, `participant_two_user_id` | `TEXT` | Nullable FKs → `app_users.firebase_uid`; used for direct chats, ordered and distinct |
 | `created_at` | `TIMESTAMPTZ` | Creation timestamp |
 
-For event chats, membership is derived from the event creator and eligible RSVP. Direct conversations store exactly two users in canonical order, with a unique index preventing a duplicate pair.
+For event chats, membership is derived from the event creator and eligible RSVP. Direct conversations store exactly two users in canonical order, with a unique index preventing a duplicate pair. Participant foreign keys use `ON DELETE RESTRICT` so hard-deleting a profile cannot cascade through a direct conversation and erase its history.
 
 ### `messages`
 
@@ -92,7 +92,7 @@ For event chats, membership is derived from the event creator and eligible RSVP.
 | `body` | `TEXT` | Required, non-empty message text |
 | `created_at` | `TIMESTAMPTZ` | Message timestamp |
 
-A composite index on conversation, timestamp, and message ID supports ordered cursor pagination. Access checks happen in the chat service before history is read or a message is sent.
+A composite index on conversation, timestamp, and message ID supports ordered cursor pagination. Access checks happen in the chat service before history is read or a message is sent. The sender foreign key also uses `ON DELETE RESTRICT`; deleting a profile that authored messages is blocked so those messages remain attributable. Account deactivation/anonymization is the intended future removal path; the application does not currently implement account deletion.
 
 ### `notifications`
 
