@@ -1,49 +1,41 @@
 # Database
 
-The initial PostgreSQL schema is in `migrations/001_initial_schema.sql`. It models profiles linked to Firebase IDs (including an optional age range and affiliation), groups and memberships, events and participation, categories, chats, messages, and persistent event notifications.
+Event Buddy Finder uses PostgreSQL. Migrations `001`–`003` build the original schema; `004_consolidate_schema.sql` migrates it to the six-table schema documented in [database-overview.md](../docs/database-overview.md). Prisma models and generated TypeScript types are maintained alongside these SQL migrations; SQL remains authoritative for PostgreSQL checks and partial indexes.
 
 ## Apply locally
 
-Create a PostgreSQL database, then run the schema migrations in order:
+Create a PostgreSQL database, set `DATABASE_URL`, and run the migrations in order:
 
 ```sh
 psql "$DATABASE_URL" -f database/migrations/001_initial_schema.sql
 psql "$DATABASE_URL" -f database/migrations/002_event_city_and_notes.sql
 psql "$DATABASE_URL" -f database/migrations/003_realtime_event_notifications.sql
-```
-
-For local API development, set `DATABASE_URL` and generate the Prisma client, then add fictional sample records and event/direct chat history with:
-
-```sh
+psql "$DATABASE_URL" -f database/migrations/004_consolidate_schema.sql
 pnpm --filter @event-buddy/database db:generate
 pnpm --filter @event-buddy/database db:seed
 ```
 
-The typed seed uses placeholder Firebase UIDs such as `demo-cathy`; it does not create Firebase Authentication accounts. It is development-only data, not real user information. Frontend demo accounts are defined in `apps/web/src/data/demo-users.ts`; development IDs map to the seeded database UIDs for event, chat, and notification requests.
+Migration 004 folds category associations into arrays, replaces direct-chat membership rows with the two participant IDs, moves notification delivery state into `notifications`, and removes the old join/catalog/group/outbox tables. It runs transactionally and stops if it finds group records, group memberships, group-owned events, malformed direct conversations, or duplicate direct-chat pairs. Resolve or export such records before applying it; do not remove the preflight checks to force the migration through. Back up any shared or production database before migrating it.
 
-The schema is maintained as PostgreSQL SQL migrations, with Prisma ORM 7 providing generated TypeScript models and typed database access for the TypeScript backend. The `@event-buddy/database` workspace package exports a shared Prisma client and model types for the Express services; generated client code is not committed. SQL migrations remain the source of truth for database constraints that Prisma's schema does not express, such as status checks.
+The typed seed uses placeholder Firebase UIDs such as `demo-cathy`; it does not create Firebase Authentication accounts. It is development-only fictional data. Frontend demo accounts are defined in `apps/web/src/data/demo-users.ts`; development IDs map to the seeded database UIDs for event, chat, and notification requests.
 
 ## Design notes
 
-- Firebase Authentication owns passwords and identity. `app_users.firebase_uid` stores the Firebase UID; backend requests must validate the Firebase ID token and use its UID to find the app profile.
-- Firebase's `email_verified` claim must be checked by the backend before profile completion or event posting. The database does not store a second, potentially stale copy of that verification state.
-- Profiles store an optional age range rather than a birth date or exact age, and an optional free-text affiliation (for example, a school or program). Group memberships remain separate in `group_members`.
-- An event has a creator and may have an organizing group. Group organizer permissions and event ownership must be checked by the backend; attendees can mark themselves interested or going without organizer approval.
-- `event_participations` has at most one current row per user and event, with a status of `interested`, `going`, or `withdrawn`. An event's `cancelled` status is separate from a user's `withdrawn` participation status.
-- Joining an event chat creates or updates the user's participation to `interested`. Users marked interested or going can access the chat. The backend should apply the participation change and conversation membership in a transaction. Direct conversations should contain exactly two users; the backend enforces this rule.
-- Event updates and cancellations should save a notification for each affected interested or going attendee before Socket.IO broadcasts to currently connected users. The inbox indexes support loading recent and unread notifications.
-- `profile_image_key` and `events.image_object_key` store DigitalOcean Spaces object keys. Image bytes stay in Spaces; the TypeScript backend will handle upload and download access and associate each key with its profile or event record.
-- Development image integration can be seeded after the schema with `psql "$DATABASE_URL" -f database/seeds/001_demo_images.sql`. The seed creates a demo profile and event that reference private fixtures already uploaded to the development bucket; do not apply it in production.
-- Event/category many-to-many relationships support multiple categories per event. Date and location indexes support the event browse and filter queries.
+- Firebase Authentication owns passwords and identity. `app_users.firebase_uid` stores the Firebase UID; backend requests validate the Firebase ID token and use its UID to find the app profile. Firebase's `email_verified` claim is checked by the backend before profile completion or event posting.
+- Profiles store an optional age range, affiliation, profile image object key, and preferred category names. The fixed category catalog is shared in TypeScript; PostgreSQL checks the allowed values and GIN indexes support category filtering.
+- An event has an individual creator, category names, and an optional image object key. Group-owned events and group profiles are outside the initial scope.
+- `event_participations` has at most one row per user and event, with a status of `interested`, `pending_approval`, `going`, `declined`, or `withdrawn`. Attendees can mark themselves interested or going without organizer approval; event cancellation is tracked separately.
+- Event-chat access is derived from the event creator and eligible RSVP status. Direct conversations store exactly two distinct participants in canonical order. Messages refer to a conversation and sender. The backend enforces access when listing or sending messages.
+- Event updates and cancellations insert persistent inbox notifications for affected interested, pending, or going participants. `published_at` tracks delivery to connected users; the Socket.IO worker can retry unclaimed notifications after a restart.
+- `profile_image_key` and `events.image_object_key` store DigitalOcean Spaces object keys. Image bytes stay in Spaces; the TypeScript image service uploads, downloads, and associates object keys with their profile or event record.
+- Date, city, RSVP, chat-pagination, and inbox indexes support the principal access paths. Category arrays use GIN indexes.
 
-## Initial assumptions to review
+## Development image fixtures
 
-- Users choose whether they are interested or going; the app does not have an organizer approval step for attendance.
-- Chat membership requires an interested or going participation status; joining the chat records interest if the user has no participation row yet.
-- Group event creation and management require an `organizer` membership role.
-- Event location is stored as a display name/address, with optional coordinates for map pins.
+The development bucket contains private fixtures referenced by `database/seeds/001_demo_images.sql`. After migrations and the main seed, associate them with demo records by running:
 
+```sh
+psql "$DATABASE_URL" -f database/seeds/001_demo_images.sql
+```
 
-## Event notification integration
-
-Grace's migration `003_realtime_event_notifications.sql` adds persisted alerts and a notification outbox. Apply it only after the separately maintained event city/notes migration (002) is integrated.
+The image seed is idempotent and development-only; do not apply it in production.

@@ -1,15 +1,12 @@
 %%{init: {"flowchart": {"nodeSpacing": 40, "rankSpacing": 80}}}%%
 flowchart LR
     U["<b>Users</b><br/>profile + interests"]
-    G["<b>Groups</b><br/>organizers"]
     E["<b>Events</b><br/>what / when / where"]
     P["<b>Participation</b><br/>interested or going"]
     C["<b>Event Chat</b><br/>messages"]
     N["<b>Notifications</b><br/>alerts on change"]
 
-    U -->|creates / joins| G
     U -->|creates| E
-    G -->|organizes| E
     U -->|marks| P
     E -->|tracked by| P
     E -->|has one| C

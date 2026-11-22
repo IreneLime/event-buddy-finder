@@ -34,8 +34,7 @@ export const createEventBodySchema = z
     priceAmount: z.number().min(0).optional(),
     capacity: z.number().int().positive().optional(),
     notes: z.string().trim().min(1).max(5_000).optional(),
-    categoryNames: z.array(z.string().trim().min(1)).default([]),
-    organizingGroupId: z.string().regex(/^\d+$/).optional(),
+    categoryNames: z.array(z.string().trim().min(1)).max(10).default([]),
     imageObjectKey: z.string().trim().min(1).optional(),
   })
   .superRefine((value, ctx) => {
@@ -62,8 +61,7 @@ export const updateEventBodySchema = z
     priceAmount: z.number().min(0).nullable().optional(),
     capacity: z.number().int().positive().nullable().optional(),
     notes: z.string().trim().min(1).max(5_000).nullable().optional(),
-    categoryNames: z.array(z.string().trim().min(1)).optional(),
-    organizingGroupId: z.string().regex(/^\d+$/).nullable().optional(),
+    categoryNames: z.array(z.string().trim().min(1)).max(10).optional(),
     imageObjectKey: z.string().trim().min(1).nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
@@ -78,6 +76,7 @@ export const updateEventBodySchema = z
       })
     }
   })
+
 
 export type EventListQueryInput = z.infer<typeof eventListQuerySchema>
 export type CreateEventBody = z.infer<typeof createEventBodySchema>

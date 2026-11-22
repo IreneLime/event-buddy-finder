@@ -30,12 +30,7 @@ export function buildEventListFilters(
 
   if (query.category) {
     const placeholder = alloc(query.category)
-    filters.push(`EXISTS (
-      SELECT 1
-      FROM event_categories ec
-      JOIN categories c ON c.id = ec.category_id
-      WHERE ec.event_id = e.id AND c.name = ${placeholder}
-    )`)
+    filters.push(`e.category_names @> ARRAY[${placeholder}]::text[]`)
   }
 
   if (query.startDate) {

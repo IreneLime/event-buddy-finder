@@ -17,15 +17,10 @@ const USER_EVENT_SELECT = `
     organizer.display_name AS organizer_name,
     (SELECT COUNT(*)::int FROM event_participations counts
       WHERE counts.event_id = e.id AND counts.status = 'going') AS participant_count,
-    COALESCE(
-      array_agg(c.name ORDER BY c.name) FILTER (WHERE c.name IS NOT NULL),
-      '{}'
-    ) AS category_names
+    e.category_names
   FROM event_participations participation
   JOIN events e ON e.id = participation.event_id
   JOIN app_users organizer ON organizer.firebase_uid = e.created_by_user_id
-  LEFT JOIN event_categories ec ON ec.event_id = e.id
-  LEFT JOIN categories c ON c.id = ec.category_id
 `
 
 export async function listPastEventsForUser(
@@ -43,7 +38,6 @@ export async function listPastEventsForUser(
       `
         ${USER_EVENT_SELECT}
         ${where}
-        GROUP BY e.id, organizer.display_name
         ORDER BY e.starts_at DESC, e.id DESC
         LIMIT $2 OFFSET $3
       `,

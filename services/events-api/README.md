@@ -11,7 +11,7 @@ Express + TypeScript service for event discovery, management, and participation.
 | `GET` | `/events` | Optional |
 | `GET` | `/events/:id` | Optional |
 | `POST` | `/events` | Yes (+ email verified when Firebase is enabled) |
-| `PATCH` | `/events/:id` | Yes (creator or group organizer) |
+| `PATCH` | `/events/:id` | Yes (creator) |
 | `DELETE` | `/events/:id` | Yes (soft-cancel) |
 | `PUT` | `/events/:id/participation` | Yes (`interested` \| `going` \| `withdrawn`) |
 | `GET` | `/events/:id/participants` | No |
@@ -23,7 +23,7 @@ Express + TypeScript service for event discovery, management, and participation.
 pnpm --filter @event-buddy/events-api dev
 ```
 
-Requires PostgreSQL with [database/migrations/001_initial_schema.sql](../../database/migrations/001_initial_schema.sql) applied.
+Requires PostgreSQL with migrations 001–004 applied. See the [database setup instructions](../../database/README.md).
 
 ### Auth
 
