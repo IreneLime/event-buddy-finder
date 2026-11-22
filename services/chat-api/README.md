@@ -113,6 +113,164 @@ response preserves newer live messages. The server list remains authoritative
 for membership: reconnects, RSVP/event changes, `conversations:changed`, and
 messages for unknown chats refresh it.
 
+## Socket.IO payload examples
+
+The following example runs against the local development server with an existing
+`demo-cathy` profile. Install/use `socket.io-client` in your client project. Resolve
+a conversation through `GET /events/:eventId/conversation` or
+`POST /conversations/direct` first; `event-7` below is an illustrative ID, not a
+guaranteed seed ID. The server identifies the sender from the connection, so do
+not put a sender ID in `message:send`.
+
+```js
+import { io } from 'socket.io-client'
+
+const socket = io('http://127.0.0.1:4002', {
+  auth: { demoUserId: 'cathy' }, // Local CHAT_DEV_MODE only.
+})
+socket.on('connect', () => {
+  socket.timeout(8000).emit('message:send', {
+    conversationId: 'event-7',
+    body: 'Meet at the main entrance?',
+  }, (transportError, result) => {
+    if (transportError) { console.error('Acknowledgement timed out'); return }
+    if (!result.ok) { console.error(result.error.code, result.error.message); return }
+    console.log('Saved message:', result.data)
+  })
+})
+socket.on('message:created', (message) => console.log('New message:', message))
+socket.on('notification:created', (notification) => console.log('Event alert:', notification))
+socket.on('conversations:changed', () => console.log('Reload conversation membership'))
+socket.on('notifications:changed', () => console.log('Reload saved inbox/read state'))
+socket.on('connect_error', (error) => console.error(error.message))
+```
+
+For Firebase-integrated deployments, use handshake `auth: { token: idToken }`
+and REST `Authorization: Bearer <idToken>`, with the server's `verifyIdentity`
+configured to verify that token. The supplied standalone startup is local-demo
+only; production identity verification must be injected. A client-supplied
+`demoUserId` or `x-demo-user-id` is never production authentication.
+
+A successful acknowledgement has this shape. `message:created` carries exactly
+the `data` object to the sender's and each eligible recipient's connected tabs,
+after the database commit. IDs are strings and times are UTC ISO timestamps.
+
+```json
+{
+  "ok": true,
+  "data": {
+    "id": "42",
+    "conversationId": "event-7",
+    "senderUserId": "cathy",
+    "senderDisplayName": "Cathy Chen",
+    "body": "Meet at the main entrance?",
+    "createdAt": "2026-11-22T03:00:00.000Z"
+  }
+}
+```
+
+A socket rejection wraps the error; for example, sending after withdrawal:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Join this event before accessing its chat."
+  }
+}
+```
+
+REST errors return the inner `{ "code", "message" }` object with an HTTP status.
+Socket acknowledgements use `ok: false` rather than an HTTP status.
+
+| HTTP status | Code | Example cause |
+| --- | --- | --- |
+| 401 | `UNAUTHENTICATED` | Missing local identity or rejected authentication |
+| 403 | `FORBIDDEN` | Withdrawn event participant, unrelated DM recipient, or conversation outsider |
+| 400 | `INVALID_INPUT` | Empty body, non-string body, or body longer than 2000 characters after trimming |
+| 400 | `INVALID_CURSOR` | Malformed message cursor or cursor from another conversation |
+| 404 | `CONVERSATION_NOT_FOUND` | Unknown conversation |
+| 503 | `CHAT_STORAGE_UNAVAILABLE` | Database lookup, message insert, or commit failure; failed sends emit no message |
+
+`notification:created` carries a saved inbox item, for example:
+
+```json
+{
+  "id": "91",
+  "kind": "event_updated",
+  "eventId": "7",
+  "eventTitle": "Neighbourhood Music Night",
+  "message": "Neighbourhood Music Night updated its location.",
+  "createdAt": "2026-11-22T03:05:00.000Z"
+}
+```
+
+Cancellation uses `kind: "event_cancelled"` and a message such as
+`"Neighbourhood Music Night has been cancelled."`. `eventId` is the public alias
+when present, otherwise the database ID string. `readAt` is omitted until read.
+Event changes save alerts for interested, pending-approval, and going attendees,
+excluding the actor and withdrawn/declined users. The outbox delivers to online
+tabs; offline users retrieve the same saved IDs from the inbox after reconnect.
+`conversations:changed` and `notifications:changed` carry no payload and require
+an authoritative refresh. Known `message:created` deliveries update previews
+locally; reconnect also refreshes membership, history, and inbox state.
+
+## REST examples
+
+These local examples require `CHAT_DEV_MODE=true`. Replace the conversation ID
+with one returned by the API. For example, create/reuse a DM after a shared RSVP:
+
+```sh
+curl -sS http://127.0.0.1:4002/conversations/direct \
+  -H 'x-demo-user-id: cathy' -H 'Content-Type: application/json' \
+  -d '{"userId":"mina"}'
+```
+
+The `201` response is a conversation detail with `id: "direct-<database-id>"`,
+`kind: "direct"`, `title`, `createdAt`, `memberCount`, optional `lastMessage`,
+`members: [{ "userId", "displayName" }]`, and `messages: { "items", "nextCursor" }`.
+Repeated or reverse requests reuse the same conversation. Load a history page:
+
+```sh
+curl -sS 'http://127.0.0.1:4002/conversations/event-7/messages?limit=2' \
+  -H 'x-demo-user-id: cathy'
+```
+
+```json
+{
+  "items": [
+    { "id": "41", "conversationId": "event-7", "senderUserId": "mina", "senderDisplayName": "Mina Park", "body": "See you there!", "createdAt": "2026-11-22T02:59:00.000Z" },
+    { "id": "42", "conversationId": "event-7", "senderUserId": "cathy", "senderDisplayName": "Cathy Chen", "body": "Meet at the main entrance?", "createdAt": "2026-11-22T03:00:00.000Z" }
+  ],
+  "nextCursor": "41"
+}
+```
+
+`items` is in chronological order. When `nextCursor` exists, pass
+`?limit=2&before=41` to request older messages. It is omitted on the oldest page.
+The limit defaults to 50 and must be between 1 and 100.
+
+```sh
+curl -sS http://127.0.0.1:4002/me/notifications -H 'x-demo-user-id: cathy'
+curl -sS -X PATCH http://127.0.0.1:4002/me/notifications/91/read -H 'x-demo-user-id: cathy'
+curl -i -X PATCH http://127.0.0.1:4002/me/notifications/read-all -H 'x-demo-user-id: cathy'
+```
+
+The inbox response is `{ "items": [<notification above>], "unreadCount": 1 }`,
+with `nextCursor` only when another page exists. Pass `?before=<nextCursor>` for
+older alerts. Reading one notification returns that item with `readAt`; reading
+all returns `204` with no body. A user cannot read another account's notification.
+
+## State across a chat service restart
+
+| State | Behavior after restart |
+| --- | --- |
+| Saved group/DM messages, conversation IDs, direct members, latest-message previews | Restored from PostgreSQL; existing seeded history remains readable |
+| Event chat access | Recomputed from current RSVP; historical sender membership cannot restore withdrawn access |
+| Notification inbox, unread/read state, pending outbox deliveries | Preserved in PostgreSQL; reconnect loads saved state |
+| Unsent drafts and live socket connections | Not stored by chat-api; the browser reconnects and reloads saved history |
+
 ## Verification
 
 ```sh

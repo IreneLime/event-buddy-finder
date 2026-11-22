@@ -54,7 +54,35 @@ export function ChatPage() {
   const { conversationId = '' } = useParams()
   const { user } = useAuth()
   if (!user) return <SignInPrompt title="Sign in to see this conversation" description="Messages are private to signed-in users. Sign in to continue." />
-  return <ChatWorkspace activeId={conversationId}><ConversationView key={`${user.id}:${conversationId}`} id={conversationId} /></ChatWorkspace>
+  return <ChatWorkspace activeId={conversationId}>{conversationId.startsWith('dm-')
+    ? <DirectConversationStart key={`${user.id}:${conversationId}`} userId={conversationId.slice(3)} />
+    : <ConversationView key={`${user.id}:${conversationId}`} id={conversationId} />}</ChatWorkspace>
+}
+
+function DirectConversationStart({ userId }: { userId: string }) {
+  const navigate = useNavigate()
+  const { api } = useChatStore()
+  const pending = useRef<Promise<ConversationDetail> | null>(null)
+  const [error, setError] = useState('')
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    let active = true
+    // Creating a DM emits conversations:changed. It must not restart or cancel
+    // this navigation. Reuse the pending request across StrictMode effect setup.
+    const request = pending.current ??= api.direct(userId)
+    request.then((conversation) => {
+      if (active) navigate(`/chats/${conversation.id}`, { replace: true })
+    }).catch((error) => { if (active) setError(chatError(error)) })
+    return () => { active = false }
+  }, [api, userId, navigate, attempt])
+
+  if (error) return <div className="chat-canvas flex h-full flex-col items-center justify-center gap-4 p-8">
+    <p role="alert" className="text-sm text-stone-600">{error}</p>
+    <Button onClick={() => { pending.current = null; setError(''); setAttempt((value) => value + 1) }}>Try again</Button>
+    <Link to="/chats" className="text-sm text-brand-700">All chats</Link>
+  </div>
+  return <div role="status" className="chat-canvas grid h-full place-items-center"><span className="flex items-center gap-3 text-sm text-stone-500"><LoaderCircle size={18} className="animate-spin" />Opening conversation…</span></div>
 }
 
 function MessageBubble({ message, mine, compact }: { message: ConversationMessage; mine: boolean; compact: boolean }) {
@@ -73,7 +101,6 @@ function ConversationView({ id }: { id: string }) {
   const { getEvent, setParticipation } = useEventStore()
   const linkedEvent = getEvent(id)
   const linkedEventId = linkedEvent?.id
-  const directUserId = id.startsWith('dm-') ? id.slice(3) : undefined
   const [conversation, setConversation] = useState<ConversationDetail | null>(null)
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [cursor, setCursor] = useState<string>()
@@ -96,10 +123,10 @@ function ConversationView({ id }: { id: string }) {
 
   useEffect(() => {
     let active = true
-    const load = linkedEventId ? chatApi.eventConversation(id) : directUserId ? chatApi.direct(directUserId) : chatApi.GetGroupChat(id)
+    const load = linkedEventId ? chatApi.eventConversation(id) : chatApi.GetGroupChat(id)
     load.then((data) => {
       if (!active) return
-      if (linkedEventId || directUserId) { navigate(`/chats/${data.id}`, { replace: true }); return }
+      if (linkedEventId) { navigate(`/chats/${data.id}`, { replace: true }); return }
       setError('')
       setConversation(data)
       setMessages((current) => mergeMessages(data.messages.items, current))
@@ -108,7 +135,7 @@ function ConversationView({ id }: { id: string }) {
       if (active) { setError(chatError(error)); setConversation(null); setMessages([]) }
     }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [chatApi, id, linkedEventId, directUserId, revision, reload, navigate])
+  }, [chatApi, id, linkedEventId, revision, reload, navigate])
 
   useEffect(() => {
     const receive = (message: ConversationMessage) => {

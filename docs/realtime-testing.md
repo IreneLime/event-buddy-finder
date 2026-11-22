@@ -1,5 +1,11 @@
 # Chat and notification regression tests
 
+The [Chromium chat journeys](../tests/e2e/README.md) exercise public-profile DMs,
+event chat, and alerts against the actual PostgreSQL-backed server entry point,
+including real process restarts. Run `TEST_DATABASE_URL=... pnpm test:e2e:chat`;
+use `pnpm test:e2e:chat dm.spec.mts` with the same environment for the standalone
+DM regression. The harness is typechecked with `pnpm typecheck:e2e`.
+
 Run from the repository root after `pnpm install`:
 
 ```sh

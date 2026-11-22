@@ -17,6 +17,7 @@ let auth: typeof import('../src/state/auth-store')
 let chat: typeof import('../src/state/chat-store')
 let context: typeof import('../src/state/chat-context')
 let pages: typeof import('../src/pages/chats-page')
+let profiles: typeof import('../src/pages/profile-page')
 let events: typeof import('../src/state/event-store')
 let client: typeof import('../src/lib/chat-api')
 let session: ChatState
@@ -30,6 +31,7 @@ beforeAll(async () => {
   chat = await import('../src/state/chat-store')
   context = await import('../src/state/chat-context')
   pages = await import('../src/pages/chats-page')
+  profiles = await import('../src/pages/profile-page')
   events = await import('../src/state/event-store')
   client = await import('../src/lib/chat-api')
   // jsdom has no scrolling layout; the behavior under test is identity and messages.
@@ -84,6 +86,15 @@ function mountPage(detail = false, conversationId = 'mina-dm') {
   </AuthProvider></StrictMode>)
 }
 
+function mountProfile(userId = 'mina') {
+  render(<StrictMode><auth.AuthProvider><AccountControls /><events.EventStoreProvider>
+    <MemoryRouter initialEntries={[`/profile/${userId}`]}><chat.ChatStoreProvider><SessionProbe /><Routes>
+      <Route path="/profile/:userId" element={<profiles.ProfilePage />} />
+      <Route path="/chats/:conversationId" element={<pages.ChatPage />} />
+    </Routes></chat.ChatStoreProvider></MemoryRouter>
+  </events.EventStoreProvider></auth.AuthProvider></StrictMode>)
+}
+
 async function logIn(id: string) {
   fireEvent.click(screen.getByRole('button', { name: `Log in as ${id}` }))
   await waitFor(() => {
@@ -113,6 +124,45 @@ async function deliver(message: ConversationMessage) {
 }
 
 describe('chat follows the signed-in account', () => {
+  it('opens a DM from a public profile once even when conversations:changed arrives before the response', async () => {
+    mountProfile()
+    await logIn('cathy')
+    const revision = session.revision
+    const realDirect = session.api.direct
+    const direct = vi.spyOn(session.api, 'direct').mockImplementation(async (target) => {
+      const conversation = await realDirect(target)
+      await waitFor(() => expect(session.revision).toBeGreaterThan(revision))
+      return conversation
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Message Mina' }))
+    const composer = await screen.findByRole('textbox', { name: 'Write a message' })
+    expect(direct).toHaveBeenCalledExactlyOnceWith('mina')
+    const peer = client.createChatSocket('mina')
+    try {
+      peer.connect()
+      await waitFor(() => expect(peer.connected).toBe(true))
+      const received = new Promise<ConversationMessage>((resolve) => peer.once('message:created', resolve))
+      fireEvent.change(composer, { target: { value: 'First message from your public profile' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+      expect((await received).body).toBe('First message from your public profile')
+      await waitForMessage('First message from your public profile')
+      expect(direct).toHaveBeenCalledTimes(1)
+    } finally { peer.disconnect() }
+  })
+
+  it('shows a failed DM initiation without looping and retries only when requested', async () => {
+    mountProfile('nadia')
+    await logIn('cathy')
+    const direct = vi.spyOn(session.api, 'direct')
+    fireEvent.click(screen.getByRole('button', { name: 'Message Nadia' }))
+    await screen.findByText('You must share an event to start a direct message.')
+    expect(direct).toHaveBeenCalledTimes(1)
+    server.service.participate('night-market', 'nadia', 'interested')
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await screen.findByRole('textbox', { name: 'Write a message' })
+    expect(direct).toHaveBeenCalledTimes(2)
+  })
+
   it('updates and sorts known chat previews without fetching the list or inbox, including duplicate and older deliveries', async () => {
     for (let index = 0; index < 25; index++) server.service.CreateGroupChat(`preview-event-${index}`, `Event ${index}`, 'cathy')
     mountPage()
