@@ -1,5 +1,6 @@
 -- Fictional local development fixtures only. These Firebase UIDs are placeholders;
 -- they are not accounts in Firebase and must never be used as production identities.
+BEGIN;
 
 INSERT INTO app_users (firebase_uid, email, display_name, age_range, affiliation, bio, profile_completed_at)
 VALUES
@@ -162,3 +163,5 @@ WHERE EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversatio
   AND EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversation_id = conversation.id AND member.user_id = 'demo-cathy')
   AND EXISTS (SELECT 1 FROM conversation_members member WHERE member.conversation_id = conversation.id AND member.user_id = 'demo-mina')
   AND NOT EXISTS (SELECT 1 FROM messages existing WHERE existing.conversation_id = conversation.id AND existing.sender_user_id = seed.sender_id AND existing.body = seed.body);
+
+COMMIT;
