@@ -48,6 +48,11 @@ function EventEditor({ event }: { event?: EventSummary }) {
   const [location, setLocation] = useState(event?.locationName ?? '')
   const [address, setAddress] = useState(event?.address ?? '')
   const [startsAt, setStartsAt] = useState(localDateTime(event?.startsAt))
+  const [endsAt, setEndsAt] = useState(() => {
+    if (event?.endsAt) return localDateTime(event.endsAt)
+    const start = event?.startsAt ? new Date(event.startsAt) : new Date(Date.now() + 24 * 60 * 60_000)
+    return localDateTime(new Date(start.getTime() + 2 * 60 * 60_000).toISOString())
+  })
   const [price, setPrice] = useState(event?.priceAmount?.toString() ?? '0')
   const [selectedCategory, setSelectedCategory] = useState(event?.categoryNames[0] ?? '')
 
@@ -62,7 +67,11 @@ function EventEditor({ event }: { event?: EventSummary }) {
         description,
         notes,
         startsAt: localDateTime(event?.startsAt) === startsAt && event ? event.startsAt : new Date(startsAt).toISOString(),
-        endsAt: event?.endsAt,
+        endsAt: endsAt
+          ? event?.endsAt && localDateTime(event.endsAt) === endsAt
+            ? event.endsAt
+            : new Date(endsAt).toISOString()
+          : undefined,
         locationName: location,
         city,
         address,
@@ -112,7 +121,8 @@ function EventEditor({ event }: { event?: EventSummary }) {
       <Card className="space-y-6 p-5 sm:p-8">
         <Field label="Event name"><Input required minLength={4} maxLength={100} placeholder="e.g. Sunday Clay Club" value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
         <Field label="Description" hint="What will people do? What should they know before joining?"><textarea required minLength={12} rows={5} className="w-full resize-y rounded-xl border border-stone-200 bg-white px-3.5 py-3 text-sm leading-6 text-stone-900 outline-none placeholder:text-stone-400 focus:border-brand-300 focus:ring-4 focus:ring-brand-100" placeholder="Tell people what makes this event special…" value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
-        <div className="grid gap-5 sm:grid-cols-2"><Field label="Date and time"><Input required type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></Field><Field label="Category"><select required value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="h-11 w-full rounded-xl border border-stone-200 bg-white px-3.5 text-sm text-stone-800 outline-none focus:border-brand-300 focus:ring-4 focus:ring-brand-100"><option value="">Choose a category</option>{Array.from(new Set([...categories, ...(event?.categoryNames ?? [])])).map((category) => <option key={category}>{category}</option>)}</select></Field></div>
+        <div className="grid gap-5 sm:grid-cols-2"><Field label="Start date and time"><Input required type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></Field><Field label="End date and time" hint="Optional"><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></Field></div>
+        <Field label="Category"><select required value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="h-11 w-full rounded-xl border border-stone-200 bg-white px-3.5 text-sm text-stone-800 outline-none focus:border-brand-300 focus:ring-4 focus:ring-brand-100"><option value="">Choose a category</option>{Array.from(new Set([...categories, ...(event?.categoryNames ?? [])])).map((category) => <option key={category}>{category}</option>)}</select></Field>
         <Field label="City"><select required value={city} onChange={(e) => setCity(e.target.value)} className="h-11 w-full rounded-xl border border-stone-200 bg-white px-3.5 text-sm text-stone-800 outline-none focus:border-brand-300 focus:ring-4 focus:ring-brand-100">{['Toronto', 'Mississauga', 'Brampton', 'Markham', 'Vaughan', 'Richmond Hill', 'Oakville'].map((name) => <option key={name}>{name}</option>)}</select></Field>
         <Field label="Location"><div className="relative"><MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" /><Input required className="pl-10" placeholder="Place or venue name" value={location} onChange={(e) => setLocation(e.target.value)} /></div></Field>
         <Field label="Address or meeting point"><Input placeholder="Street address or useful directions" value={address} onChange={(e) => setAddress(e.target.value)} /></Field>
