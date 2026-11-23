@@ -28,10 +28,16 @@ Requires PostgreSQL with migrations 001–004 applied. See the [database setup i
 ### Auth
 
 - Production / shared envs: set `FIREBASE_PROJECT_ID`, and optionally `FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY`, then send `Authorization: Bearer <Firebase ID token>`.
-- Local without Firebase (opt-in): set `ALLOW_DEV_AUTH=true` and send `Authorization: Bearer dev:<firebase_uid>`.
+- Local without Firebase (opt-in): set `ALLOW_DEV_AUTH=true` and send `Authorization: Bearer dev:<firebase_uid>` (verified) or `Bearer dev-unverified:<firebase_uid>` (signed in, email not verified).
   - Off by default
   - Disabled when `NODE_ENV=production`
   - Disabled whenever `FIREBASE_PROJECT_ID` is set
+- Rejected mutation integration tests (non-owner edit/cancel, unverified create) skip unless `TEST_DATABASE_URL` is set:
+
+```sh
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres pnpm --filter @event-buddy/events-api test
+```
+
 
 ### Environment
 
