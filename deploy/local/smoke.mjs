@@ -75,7 +75,6 @@ try {
   assert.equal(savedTitle, title);
   console.log('Public event browsing, seeded image keys, and database persistence passed.');
 } finally {
-  try { execFileSync('./install.sh', ['--stop'], { stdio: 'inherit' }); } catch { /* cleanup is best effort */ }
   rmSync(credentialsDirectory, { recursive: true, force: true });
   if (hadEnvFile) writeFileSync(envFile, originalEnv);
   else rmSync(envFile, { force: true });

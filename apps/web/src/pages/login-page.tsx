@@ -53,8 +53,13 @@ export function LoginPage() {
         'auth/weak-password': 'Choose a stronger password.',
         'auth/network-request-failed': 'Could not reach sign-in. Check your connection and try again.',
         'auth/too-many-requests': 'Too many attempts. Please try again later.',
+        'auth/operation-not-allowed': 'Email and password sign-in is disabled for this Firebase project. Enable it in Firebase Authentication settings.',
+        'auth/unauthorized-domain': 'This website is not authorized by Firebase. Add localhost to the project’s authorized domains.',
       }
-      setError(code && messages[code] || (live ? 'Could not complete sign-in or registration. Please try again.' : 'That demo email and password do not match.'))
+      const authError = code?.startsWith('auth/api-key-not-valid') || code === 'auth/invalid-api-key'
+        ? 'Firebase rejected the web API key. Check VITE_FIREBASE_API_KEY in .env against the Firebase project settings, then restart the app.'
+        : code && messages[code]
+      setError(authError || (live ? 'Could not complete sign-in or registration. Please try again.' : 'That demo email and password do not match.'))
     } finally {
       setWorking(false)
     }
