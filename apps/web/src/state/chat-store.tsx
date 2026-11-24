@@ -87,6 +87,7 @@ function ChatSession({ userId, children }: { userId: string | undefined; childre
 
   async function markNotificationRead(id: string) {
     const updated = await chatApi.readNotification(id)
+    setLiveAlerts((current) => current.filter((item) => item.id !== id))
     setNotifications((current) => mergeAlerts(current, [updated]))
     await refresh()
   }
