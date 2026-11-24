@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import { cert, getApps, initializeApp } from 'firebase-admin/app'
+import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 
 import { env } from '../config/env.js'
@@ -21,6 +21,7 @@ function ensureFirebase(): boolean {
       })
     } else {
       initializeApp({
+        credential: applicationDefault(),
         projectId: env.firebaseProjectId,
       })
     }

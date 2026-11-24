@@ -12,7 +12,7 @@ The authentication middleware is ready to protect future profile routes. Profile
 
 ## Configuration
 
-Copy `.env.example` to an ignored `.env`. For a real Firebase project, set `FIREBASE_PROJECT_ID` and provide Application Default Credentials through `GOOGLE_APPLICATION_CREDENTIALS`, inject `FIREBASE_SERVICE_ACCOUNT_JSON`, or use the same `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` variables supported by the events service. For the Authentication Emulator, set `FIREBASE_AUTH_EMULATOR_HOST` without `http://` or `https://`.
+Copy the repository-root `.env.example` to the ignored root `.env`. For a real Firebase project, set `FIREBASE_PROJECT_ID` and point `GOOGLE_APPLICATION_CREDENTIALS` to the ignored root `firebase-admin.json`. All backend APIs load the same root configuration. For the Authentication Emulator, set `FIREBASE_AUTH_EMULATOR_HOST` without `http://` or `https://`.
 
 Set `DATABASE_URL` to the shared PostgreSQL deployment before profile routes are enabled. The service now exposes a reusable connection pool in `src/db/pool.ts`; no route queries the database yet.
 

@@ -11,3 +11,6 @@ playwright-report/
 test-results/
 firebase-debug.log
 ui-debug.log
+
+# Local Firebase Admin service-account key. Never commit this file.
+firebase-admin.json
