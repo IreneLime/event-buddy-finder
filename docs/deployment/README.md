@@ -1,17 +1,27 @@
 # Run Event Buddy Finder locally
 
-1. Start Docker Desktop or Docker Engine with Docker Compose.
-2. From the repository root, run `./install.sh`. The first run downloads and builds the containers, initializes PostgreSQL with the checked-in demo data, and starts the app.
-3. Open [http://127.0.0.1:5180](http://127.0.0.1:5180). Sign in as `cathy.chen@example.com` or `mina.park@example.com` with password `demo only`.
+Choose one of the two setup options below. Both use real Firebase Authentication and DigitalOcean Spaces. PostgreSQL stays local to your computer.
 
-The default setup includes the Firebase Auth Emulator and S3-compatible local image storage. It needs no Firebase or DigitalOcean credentials. Use two browser profiles to open **Event Buddy Demo Meetup** as both users and test chat. As Cathy, you can edit the event to test live notifications and upload a cover to test image storage.
+## Docker setup
 
-Run `./install.sh --stop` to stop the containers while keeping the database and uploaded images. Use the preconfigured accounts for repeat demos. Additional emulator accounts and in-memory chat history reset when the app container stops.
+1. Install and start Docker Desktop or Docker Engine with Compose.
+2. From the repository root, copy `.env.example` to `.env` and add the team's Firebase web configuration, Firebase Admin service-account file path, and DigitalOcean Spaces credentials. Keep `.env` and the service-account file private and out of Git.
+3. Run `./install.sh`. It builds the application, starts the app and PostgreSQL containers, applies migrations, and loads demo data on a fresh database.
+4. Open [http://localhost:5180](http://localhost:5180).
 
-After pulling updates, rerun `./install.sh`. It applies pending database migrations before starting the app, including migration 004 for the consolidated six-table schema. Existing Docker volumes keep their data and the seed runs only on fresh setup. A failed migration stops startup and can be retried after the issue is fixed. If the database has migrations missing from your checkout, switch to a branch that includes them before restarting.
+Event listings are public. To use account features, register with an email address, verify the email through Firebase, and complete the profile. The seeded demo profiles are PostgreSQL display data; they are not Firebase login accounts.
 
-If setup reports a port conflict, stop the other instance of the app or the service occupying that port, then retry.
+Uploaded profile and event images are stored in DigitalOcean Spaces. PostgreSQL stores the associated object keys. Each developer's PostgreSQL data persists in the Docker volume across restarts and container rebuilds. `./install.sh --stop` stops the containers without deleting the database volume.
 
-## Connect to shared cloud services
+After pulling code updates, rerun `./install.sh` to apply pending migrations and rebuild the app. Existing database volumes keep their data; demo seeds are loaded only for a fresh database. If startup reports a port conflict, stop the other app instance or service using the port and retry.
 
-Use `./install.sh --cloud` only to run against real Firebase Authentication and DigitalOcean Spaces. This mode requires Node.js 24+, a running PostgreSQL server and `psql`. On the first run it creates `.env.local-install` for the team's Firebase and Spaces credentials. Fill those in and rerun `./install.sh --cloud`. The config is ignored by Git.
+## Run without Docker
+
+Use this option if you prefer to run the application services directly on your computer.
+
+1. Install Node.js 24 or newer, PostgreSQL, and `psql`, and make sure PostgreSQL is running.
+2. Run `./install.sh --cloud`. On the first run, it creates `.env.local-install` from `local-install.env.example` and asks you to fill in the Firebase web configuration, Firebase Admin service-account path, and DigitalOcean Spaces credentials.
+3. Run `./install.sh --cloud` again after completing the settings. It installs workspace dependencies, applies database migrations, and loads demo data on a fresh database before starting the services.
+4. Open [http://localhost:5173](http://localhost:5173).
+
+This option uses the PostgreSQL server on your computer rather than a Docker database. The `.env.local-install` file and service-account file are local credentials and must not be committed. Use `./install.sh --cloud --setup-only` to install dependencies and apply migrations without starting the services.

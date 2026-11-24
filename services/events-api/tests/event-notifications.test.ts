@@ -41,7 +41,9 @@ describe('persistent real-time event notifications', { skip: !process.env.TEST_D
     process.env.DATABASE_URL = databaseUrl
     process.env.ALLOW_DEV_AUTH = 'true'
     process.env.NODE_ENV = 'test'
-    delete process.env.FIREBASE_PROJECT_ID
+    // Keep an explicitly empty value so Node's local .env loading cannot
+    // restore a real Firebase project into this development-auth test.
+    process.env.FIREBASE_PROJECT_ID = ''
     database = new pg.Pool({ connectionString: databaseUrl })
 for (const file of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql', '004_consolidate_schema.sql', '005_chat_message_notifications.sql', '006_demo_image_object_keys.sql']) {
       await database.query(await readFile(new URL(`../../../database/migrations/${file}`, import.meta.url), 'utf8'))

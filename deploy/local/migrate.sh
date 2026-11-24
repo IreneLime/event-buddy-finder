@@ -72,6 +72,17 @@ for file in database/migrations/[0-9][0-9][0-9]_*.sql; do
 done
 
 cat >> "$batch" <<'SQL'
+-- Before the migration sequence was consolidated, this local image-key
+-- migration was numbered 005. Its replacement is 006 because 005 is now the
+-- chat-notifications migration. Re-run the idempotent 006 migration for those
+-- volumes instead of treating the old ledger name as an unknown downgrade.
+DELETE FROM deployment.applied_step
+WHERE name = '005_demo_image_object_keys.sql'
+  AND EXISTS (
+    SELECT 1 FROM available_migration
+    WHERE name = '006_demo_image_object_keys.sql'
+  );
+
 DO $$
 DECLARE
   missing text;

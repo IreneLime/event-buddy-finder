@@ -61,7 +61,9 @@ for (const migration of ['001_initial_schema.sql', '002_event_city_and_notes.sql
     process.env.DATABASE_URL = databaseUrl
     process.env.ALLOW_DEV_AUTH = 'true'
     process.env.NODE_ENV = 'test'
-    delete process.env.FIREBASE_PROJECT_ID
+    // Keep an explicitly empty value so Node's local .env loading cannot
+    // restore a real Firebase project into this development-auth test.
+    process.env.FIREBASE_PROJECT_ID = ''
     const root = resolve(process.env.EVENTS_API_TEST_ROOT ?? fileURLToPath(new URL('../../events-api/', import.meta.url)))
     const { createApp } = await import(pathToFileURL(resolve(root, 'src/app.ts')).href)
     eventsPool = (await import(pathToFileURL(resolve(root, 'src/db/pool.ts')).href)).pool
