@@ -46,7 +46,7 @@ node -e '
   if (account.type !== "service_account" || account.project_id !== process.env.FIREBASE_PROJECT_ID || !account.client_email || !account.private_key) process.exit(1);
 ' || fail 'Use a Firebase service account JSON from the same project as the web app.'
 
-unset PORT FIREBASE_AUTH_EMULATOR_HOST VITE_FIREBASE_AUTH_EMULATOR_URL
+unset PORT FIREBASE_AUTH_EMULATOR_HOST VITE_USE_FIREBASE_AUTH_EMULATOR VITE_FIREBASE_AUTH_EMULATOR_URL
 export HOST=127.0.0.1 WEB_ORIGIN=http://localhost:5173 AUTH_API_URL=http://localhost:4003
 export CHAT_DEV_MODE=false ALLOW_DEV_AUTH=false
 export VITE_EVENTS_API_URL=http://localhost:4001 VITE_CHAT_API_URL=http://localhost:4002
@@ -72,7 +72,7 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'target')
 SQL
 fi
 
-sh deploy/local/migrate.sh
+sh deploy/local/migrate.sh --seed
 
 if [[ "${1:-}" == --setup-only ]]; then
   printf '%s\n' 'Local setup complete.'

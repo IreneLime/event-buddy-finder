@@ -5,7 +5,10 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 case "${1:-}" in
   --cloud) shift; exec ./deploy/local/install-cloud.sh "$@" ;;
   -h|--help)
-    printf '%s\n' 'Usage: ./install.sh [--stop | --cloud [--setup-only]]' 'Default: Docker app + local PostgreSQL + real Firebase and Spaces.'
+    printf '%s\n' \
+      'Usage: ./install.sh [--stop | --cloud [--setup-only]]' \
+      'Default: Docker app + PostgreSQL container; configure Firebase and Spaces in .env.' \
+      '--cloud: run services on the host with local PostgreSQL; configure .env.local-install (Node.js 24+ and psql required).'
     exit 0 ;;
   ''|--stop) ;;
   *) printf '%s\n' 'Usage: ./install.sh [--stop | --cloud [--setup-only]]' >&2; exit 1 ;;
