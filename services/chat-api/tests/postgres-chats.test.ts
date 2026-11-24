@@ -36,7 +36,7 @@ describe('PostgreSQL chat persistence', { skip: !process.env.TEST_DATABASE_URL, 
     url.pathname = `/${name}`
     databaseUrl = url.toString()
     database = new pg.Pool({ connectionString: databaseUrl })
-    for (const migration of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql', '004_consolidate_schema.sql']) {
+    for (const migration of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql', '004_consolidate_schema.sql', '005_chat_message_notifications.sql']) {
       await database.query(await readFile(new URL(`../../../database/migrations/${migration}`, import.meta.url), 'utf8'))
     }
   })
@@ -155,6 +155,12 @@ describe('PostgreSQL chat persistence', { skip: !process.env.TEST_DATABASE_URL, 
 
     await stopServer()
     await startProcess()
+    const inbox = await api('/me/notifications', 'cathy')
+    assert.equal(inbox.unreadCount, 1)
+    assert.equal(inbox.items[0].kind, 'chat_message')
+    assert.equal(inbox.items[0].conversationId, dm.id)
+    assert.equal((await api('/me/notifications', 'alex')).items[0].conversationId, conversation.id)
+    assert.equal((await api('/me/notifications', 'nadia')).unreadCount, 0)
     const restored: ConversationDetail = await group()
     assert.equal(restored.id, conversation.id)
     assert.deepEqual(restored.messages.items, [sent.data])

@@ -230,7 +230,17 @@ export class PostgresChats implements ChatPersistence {
       const message: ConversationMessage = { id: saved.rows[0].id, conversationId: conversation.id, senderUserId: userId,
         senderDisplayName: conversation.members.find((member) => member.userId === userId)!.displayName,
         body: text, createdAt: saved.rows[0].created_at.toISOString() }
-      return { message, recipients: conversation.members.map((member) => member.userId) }
+      const recipients = conversation.members.map((member) => member.userId)
+      const otherUsers = recipients.filter((recipient) => recipient !== userId).map((recipient) => this.databaseUser(recipient))
+      if (otherUsers.length) {
+        await client.query(`INSERT INTO notifications (recipient_user_id, actor_user_id, conversation_id, kind, message)
+          SELECT recipient, $2, $3, 'chat_message', $4 FROM unnest($1::text[]) AS recipient`,
+        [otherUsers, sender, conversation.databaseId, conversation.kind === 'event'
+          ? `${message.senderDisplayName} sent a message in ${conversation.title}.`
+          : `${message.senderDisplayName} sent you a message.`])
+        await client.query("SELECT pg_notify('event_notifications', 'changed')")
+      }
+      return { message, recipients }
     })
   }
 

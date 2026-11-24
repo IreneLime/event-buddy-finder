@@ -1,3 +1,4 @@
+import { notificationHref } from '../lib/notification-display'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Bell, CalendarDays } from 'lucide-react'
@@ -16,7 +17,7 @@ export function NotificationsMenu() {
     try {
       await markNotificationRead(notification.id)
       setOpen(false)
-      navigate(`/events/${notification.eventId}`)
+      navigate(notificationHref(notification))
     } catch (error) { setError(chatError(error)) }
   }
 

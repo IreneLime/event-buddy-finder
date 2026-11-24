@@ -185,9 +185,10 @@ export interface ChatMessage {
 
 export interface NotificationItem {
   id: string
-  kind: 'event_updated' | 'event_cancelled'
-  eventId: string
+  kind: 'event_updated' | 'event_cancelled' | 'chat_message'
+  eventId?: string
   eventTitle?: string
+  conversationId?: string
   message: string
   createdAt: string
   readAt?: string

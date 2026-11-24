@@ -139,7 +139,9 @@ test('two verified users discover, join, chat about, and cancel an event', async
     await attendee.page.getByRole('button', { name: 'Send message' }).click()
     await expect(attendee.page.getByRole('log').getByText(messageFromAttendee)).toBeVisible()
 
-    await host.page.getByRole('link', { name: 'Open event chat' }).click()
+    await expect(host.page.getByRole('status').filter({ hasText: 'New chat message' })).toBeVisible()
+    await host.page.getByRole('button', { name: 'Notifications, 1 unread' }).click()
+    await host.page.getByRole('button', { name: new RegExp(`sent a message in ${eventTitle}`) }).click()
     await expect(host.page.getByRole('log').getByText(messageFromAttendee)).toBeVisible()
     await host.page.getByRole('link', { name: 'View event' }).click()
     await host.page.getByRole('button', { name: 'Cancel event' }).click()

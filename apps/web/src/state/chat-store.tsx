@@ -1,3 +1,4 @@
+import { notificationHref, notificationTitle } from '../lib/notification-display'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ConversationMessage, ConversationSummary, NotificationItem } from '@event-buddy/contracts'
 import { chatError, createChatApi, createChatSocket } from '../lib/chat-api'
@@ -135,13 +136,15 @@ function ChatSession({ userId, children }: { userId: string | undefined; childre
         if (!notification.readAt) setUnreadCount((count) => count + 1)
         if (browserAlerts.current && browserPermission() === 'granted') {
           try {
-            const alert = new Notification(notification.kind === 'event_cancelled' ? 'Event cancelled' : 'Event updated', { body: notification.message, tag: notification.id })
-            alert.onclick = () => { window.focus(); window.location.assign(`/events/${encodeURIComponent(notification.eventId)}`); alert.close() }
+            const alert = new Notification(notificationTitle(notification), { body: notification.message, tag: notification.id })
+            alert.onclick = () => { window.focus(); window.location.assign(notificationHref(notification)); alert.close() }
           } catch { /* The saved in-app alert still works if the browser rejects desktop notifications. */ }
         }
       }
-      void refresh()
-      void refreshEvents()
+      if (notification.kind !== 'chat_message') {
+        void refresh()
+        void refreshEvents()
+      }
     }
     socket.on('connect', connect).on('disconnect', disconnect).on('connect_error', failure)
     socket.on('conversations:changed', changed).on('message:created', message)

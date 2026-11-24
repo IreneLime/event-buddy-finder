@@ -211,7 +211,7 @@ export function createChatServer(options: ServerOptions = {}) {
   })
   options.notifications?.subscribe?.((userId, notification) => {
     io.to(room(userId)).emit('notification:created', notification)
-    const event = service.store.events.get(notification.eventId)
+    const event = notification.eventId ? service.store.events.get(notification.eventId) : undefined
     if (event && notification.eventTitle) {
       event.title = notification.eventTitle
       for (const conversation of service.store.conversations.values()) {

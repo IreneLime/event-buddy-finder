@@ -14,8 +14,9 @@ interface NotificationRow {
   id: string
   recipient_user_id: string
   kind: NotificationItem['kind']
-  event_id: string
-  event_title: string
+  event_id: string | null
+  event_title: string | null
+  conversation_id: string | null
   message: string
   created_at: Date
   read_at: Date | null
@@ -23,10 +24,14 @@ interface NotificationRow {
 
 const selectNotification = `SELECT n.id::text, n.recipient_user_id, n.kind,
   COALESCE(e.public_id, e.id::text) AS event_id, e.title AS event_title,
-  n.message, n.created_at, n.read_at FROM notifications n JOIN events e ON e.id = n.event_id`
+  CASE c.kind WHEN 'event' THEN 'event-' || c.event_id WHEN 'direct' THEN 'direct-' || c.id END AS conversation_id,
+  n.message, n.created_at, n.read_at FROM notifications n
+  LEFT JOIN events e ON e.id = n.event_id
+  LEFT JOIN conversations c ON c.id = n.conversation_id`
 
 function item(row: NotificationRow): NotificationItem {
-  return { id: row.id, kind: row.kind, eventId: row.event_id, eventTitle: row.event_title,
+  return { id: row.id, kind: row.kind, eventId: row.event_id ?? undefined, eventTitle: row.event_title ?? undefined,
+    conversationId: row.conversation_id ?? undefined,
     message: row.message, createdAt: row.created_at.toISOString(), readAt: row.read_at?.toISOString() }
 }
 
@@ -106,7 +111,7 @@ export class PostgresNotifications implements NotificationStore {
       try {
         await client.query('BEGIN')
         const batch = await client.query<NotificationRow>(`${selectNotification}
-          WHERE n.published_at IS NULL AND n.event_id IS NOT NULL
+          WHERE n.published_at IS NULL AND (n.event_id IS NOT NULL OR n.conversation_id IS NOT NULL)
           ORDER BY n.id LIMIT 100 FOR UPDATE OF n SKIP LOCKED`)
         for (const row of batch.rows) publish(this.socketUser(row.recipient_user_id), item(row))
         if (batch.rows.length) await client.query('UPDATE notifications SET published_at = NOW() WHERE id = ANY($1::bigint[])', [batch.rows.map((row) => row.id)])
