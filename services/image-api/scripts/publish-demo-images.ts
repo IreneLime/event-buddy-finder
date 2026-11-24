@@ -8,7 +8,12 @@ import pg from 'pg'
 
 const projectId = required('FIREBASE_PROJECT_ID')
 const apiKey = required('LIVE_FIREBASE_API_KEY')
-const serviceAccount = JSON.parse(required('FIREBASE_SERVICE_ACCOUNT_JSON')) as {
+const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
+  ?? (process.env.GOOGLE_APPLICATION_CREDENTIALS
+    ? await readFile(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8')
+    : undefined)
+if (!serviceAccountJson) throw new Error('Set FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS.')
+const serviceAccount = JSON.parse(serviceAccountJson) as {
   project_id: string
   client_email: string
   private_key: string
@@ -31,14 +36,37 @@ if (!isLocal && !databaseName.startsWith('event_buddy_demo_')) {
   throw new Error('Refusing to publish: remote DATABASE_URL must name a non-production event_buddy_demo_* database.')
 }
 
-const imageApi = process.env.LIVE_IMAGE_API_URL ?? 'http://127.0.0.1:4105'
-const authApi = process.env.LIVE_AUTH_API_URL ?? 'http://127.0.0.1:4103'
+const imageApi = process.env.LIVE_IMAGE_API_URL ?? 'http://127.0.0.1:4005'
+const authApi = process.env.LIVE_AUTH_API_URL ?? 'http://127.0.0.1:4003'
 const assetDirectory = resolve(fileURLToPath(new URL('../../../apps/web/src/assets/demo-events/', import.meta.url)))
-const fixtures = [
+const fixtures: Array<{ eventId?: string; eventTitle?: string; file: string }> = [
+  { eventId: 'night-market', file: 'toronto-night-market.jpg' },
+  { eventId: 'flower-market', file: 'toronto-flower-market.jpg' },
+  { eventId: 'salsa-social', file: 'toronto-salsa-social.jpg' },
+  { eventId: 'lakeside-hangout', file: 'mississauga-lakeside-hangout.jpg' },
+  { eventId: 'demo-community-meetup', file: 'toronto-community-coffee.jpg' },
   { eventId: 'riverside-photo-walk', file: 'toronto-park-walk.jpg' },
-  { eventId: 'brampton-market', file: 'toronto-flower-market.jpg' },
   { eventId: 'toronto-clay-workshop', file: 'toronto-pottery-workshop.jpg' },
+  { eventId: 'harbourfront-sketchbook', file: 'toronto-harbourfront-sketchbook.jpg' },
+  { eventId: 'kensington-tasting', file: 'toronto-kensington-tasting.jpg' },
+  { eventId: 'toronto-board-games', file: 'toronto-board-games.jpg' },
+  { eventId: 'high-park-birds', file: 'toronto-high-park-birds.jpg' },
+  { eventId: 'toronto-acoustic', file: 'toronto-acoustic-coffee.jpg' },
+  { eventId: 'scarborough-stretch', file: 'scarborough-morning-stretch.jpg' },
+  { eventId: 'toronto-zine-swap', file: 'toronto-zine-swap.jpg' },
+  { eventId: 'parkdale-social', file: 'toronto-parkdale-coffee.jpg' },
+  { eventId: 'port-credit-walk', file: 'mississauga-port-credit-walk.jpg' },
+  { eventId: 'brampton-market', file: 'brampton-makers-market.jpg' },
+  { eventId: 'markham-gallery', file: 'markham-gallery-afternoon.jpg' },
+  { eventId: 'vaughan-dance', file: 'vaughan-first-steps-dance.jpg' },
+  { eventId: 'richmond-hill-books', file: 'richmond-hill-book-swap.jpg' },
+  { eventId: 'oakville-trail', file: 'oakville-creek-trail.jpg' },
+  { eventTitle: 'Event Buddy Demo Meetup', file: 'toronto-community-meetup.jpg' },
 ]
+
+if (new Set(fixtures.map((fixture) => fixture.file)).size !== fixtures.length) {
+  throw new Error('Each seeded event must have a distinct image fixture.')
+}
 
 const adminApp = getApps()[0] ?? initializeApp({
   credential: cert({ projectId, clientEmail: serviceAccount.client_email, privateKey: serviceAccount.private_key }),
@@ -90,31 +118,34 @@ async function main() {
       const result = await pool.query<{ id: string; owner_id: string; email: string; display_name: string }>(
         `SELECT e.id::text, e.created_by_user_id AS owner_id, u.email, u.display_name
          FROM events e JOIN app_users u ON u.firebase_uid = e.created_by_user_id
-         WHERE e.public_id = $1`, [fixture.eventId],
+         WHERE ($1::text IS NOT NULL AND to_jsonb(e)->>'public_id' = $1)
+            OR ($2::text IS NOT NULL AND e.title = $2)
+         LIMIT 1`, [fixture.eventId ?? null, fixture.eventTitle ?? null],
       )
       const event = result.rows[0]
-      if (!event) throw new Error(`Seed event ${fixture.eventId} is missing. Apply database seeds 001_demo_data.sql and 002_explore_demo.sql first.`)
+      const label = fixture.eventId ?? fixture.eventTitle!
+      if (!event) throw new Error(`Seed event ${label} is missing. Apply database seeds 001_demo_data.sql and 002_explore_demo.sql first.`)
       const token = await tokenFor(event.owner_id, event.email, event.display_name)
       const image = await readFile(resolve(assetDirectory, fixture.file))
       const form = new FormData()
       form.set('image', new Blob([image], { type: 'image/jpeg' }), fixture.file)
-      await jsonRequest(`${imageApi}/events/${encodeURIComponent(fixture.eventId)}/image`, {
+      await jsonRequest(`${imageApi}/events/${encodeURIComponent(event.id)}/image`, {
         method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
       })
-      uploaded.push({ eventId: fixture.eventId, token })
+      uploaded.push({ eventId: event.id, token })
 
-      const imageInfo = await jsonRequest<{ imageUrl: string }>(`${imageApi}/events/${encodeURIComponent(fixture.eventId)}/image`)
+      const imageInfo = await jsonRequest<{ imageUrl: string }>(`${imageApi}/events/${encodeURIComponent(event.id)}/image`)
       const downloaded = await fetch(imageInfo.imageUrl)
-      if (!downloaded.ok) throw new Error(`Signed image download for ${fixture.eventId} returned ${downloaded.status}.`)
+      if (!downloaded.ok) throw new Error(`Signed image download for ${label} returned ${downloaded.status}.`)
       const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
-      if (hash(new Uint8Array(await downloaded.arrayBuffer())) !== hash(image)) throw new Error(`Downloaded image for ${fixture.eventId} does not match the committed fixture.`)
+      if (hash(new Uint8Array(await downloaded.arrayBuffer())) !== hash(image)) throw new Error(`Downloaded image for ${label} does not match the committed fixture.`)
 
       const keyResult = await pool.query<{ image_object_key: string | null }>(
         `SELECT image_object_key FROM events WHERE id = $1`, [event.id],
       )
       const key = keyResult.rows[0]?.image_object_key
-      if (!key?.startsWith(`event-images/${event.id}/`)) throw new Error(`The event image key was not persisted for ${fixture.eventId}.`)
-      console.info(`${keep ? 'Published' : 'Verified'} ${fixture.eventId} -> ${key}`)
+      if (!key?.startsWith(`event-images/${event.id}/`)) throw new Error(`The event image key was not persisted for ${label}.`)
+      console.info(`${keep ? 'Published' : 'Verified'} ${label} -> ${key}`)
     }
   } finally {
     if (cleanup) {
