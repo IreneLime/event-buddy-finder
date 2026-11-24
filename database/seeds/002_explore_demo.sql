@@ -82,6 +82,35 @@ FROM explore_demo_events seed
 WHERE event.public_id = seed.public_id
   AND event.created_by_user_id = seed.owner_id;
 
+-- Demo photos live in DigitalOcean Spaces. Stable public IDs keep object keys
+-- consistent even when a developer's local PostgreSQL event IDs differ.
+UPDATE events event
+SET image_object_key = 'event-images/' || seed.public_id || '/' || seed.image_file
+FROM (VALUES
+  ('night-market', 'toronto-night-market.jpg'),
+  ('flower-market', 'toronto-flower-market.jpg'),
+  ('salsa-social', 'toronto-salsa-social.jpg'),
+  ('lakeside-hangout', 'mississauga-lakeside-hangout.jpg'),
+  ('demo-community-meetup', 'toronto-community-coffee.jpg'),
+  ('riverside-photo-walk', 'toronto-park-walk.jpg'),
+  ('toronto-clay-workshop', 'toronto-pottery-workshop.jpg'),
+  ('harbourfront-sketchbook', 'toronto-harbourfront-sketchbook.jpg'),
+  ('kensington-tasting', 'toronto-kensington-tasting.jpg'),
+  ('toronto-board-games', 'toronto-board-games.jpg'),
+  ('high-park-birds', 'toronto-high-park-birds.jpg'),
+  ('toronto-acoustic', 'toronto-acoustic-coffee.jpg'),
+  ('scarborough-stretch', 'scarborough-morning-stretch.jpg'),
+  ('toronto-zine-swap', 'toronto-zine-swap.jpg'),
+  ('parkdale-social', 'toronto-parkdale-coffee.jpg'),
+  ('port-credit-walk', 'mississauga-port-credit-walk.jpg'),
+  ('brampton-market', 'brampton-makers-market.jpg'),
+  ('markham-gallery', 'markham-gallery-afternoon.jpg'),
+  ('vaughan-dance', 'vaughan-first-steps-dance.jpg'),
+  ('richmond-hill-books', 'richmond-hill-book-swap.jpg'),
+  ('oakville-trail', 'oakville-creek-trail.jpg')
+) AS seed(public_id, image_file)
+WHERE event.public_id = seed.public_id;
+
 -- Seed attendance history and upcoming interests without replacing existing RSVPs.
 INSERT INTO event_participations (event_id, user_id, status)
 SELECT event.id, seed.user_id, seed.status

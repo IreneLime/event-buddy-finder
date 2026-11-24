@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   authenticate: vi.fn(),
   resolveEventImageId: vi.fn(),
+  getEventPublicId: vi.fn(),
   getProfileImageKey: vi.fn(),
   replaceProfileImageKey: vi.fn(),
   getEventImageKey: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock('../src/services/auth-client.js', () => ({
 }))
 vi.mock('../src/modules/images/image.repository.js', () => ({
   resolveEventImageId: mocks.resolveEventImageId,
+  getEventPublicId: mocks.getEventPublicId,
   getProfileImageKey: mocks.getProfileImageKey,
   replaceProfileImageKey: mocks.replaceProfileImageKey,
   getEventImageKey: mocks.getEventImageKey,
@@ -43,6 +45,7 @@ beforeEach(() => {
     emailVerified: true,
   })
   mocks.resolveEventImageId.mockResolvedValue('9')
+  mocks.getEventPublicId.mockResolvedValue(null)
   mocks.getProfileImageKey.mockResolvedValue('profile-images/user-1/current.png')
   mocks.replaceProfileImageKey.mockResolvedValue({ previousKey: null })
   mocks.getEventImageKey.mockResolvedValue('event-images/9/current.png')
@@ -101,6 +104,21 @@ describe('image API functional routes', () => {
     expect(response.status).toBe(200)
     expect(storage.upload).toHaveBeenCalledOnce()
     expect(response.body.imageUrl).toMatch(/^https:\/\/signed\.example\/event-images\/9\//)
+  })
+
+  it('replaces a seeded event image stored under its stable public ID', async () => {
+    mocks.getEventPublicId.mockResolvedValueOnce('night-market')
+    mocks.replaceEventImageKey.mockResolvedValueOnce({
+      previousKey: 'event-images/night-market/toronto-night-market.jpg',
+    })
+
+    const response = await request(createApp(storage))
+      .post('/events/9/image')
+      .set('Authorization', 'Bearer valid-token')
+      .attach('image', png, { filename: 'event.png', contentType: 'image/png' })
+
+    expect(response.status).toBe(200)
+    expect(storage.delete).toHaveBeenCalledWith('event-images/night-market/toronto-night-market.jpg')
   })
 
   it('DELETE /events/:id/image clears and deletes the event image', async () => {

@@ -19,10 +19,11 @@ async function deleteWithoutFailing(storage: ObjectStorage, key: string): Promis
 async function deleteOwnedObjectWithoutFailing(
   storage: ObjectStorage,
   key: string,
-  ownerPrefix: string,
+  ownerPrefixes: string | string[],
 ): Promise<void> {
-  if (!key.startsWith(`${ownerPrefix}/`)) {
-    console.warn(`Skipped deletion of image object outside ${ownerPrefix}`)
+  const allowedPrefixes = Array.isArray(ownerPrefixes) ? ownerPrefixes : [ownerPrefixes]
+  if (!allowedPrefixes.some((prefix) => key.startsWith(`${prefix}/`))) {
+    console.warn('Skipped deletion of image object outside the owning profile or event')
     return
   }
   await deleteWithoutFailing(storage, key)
@@ -104,6 +105,8 @@ export async function uploadEventImage(
   const id = await imageRepository.resolveEventImageId(eventId)
   if (!id) throw new ApiError(404, 'Event not found')
   const ownerPrefix = 'event-images/' + id
+  const publicId = await imageRepository.getEventPublicId(id)
+  const allowedPrefixes = publicId ? [ownerPrefix, `event-images/${encodeURIComponent(publicId)}`] : [ownerPrefix]
   const uploaded = await upload(ownerPrefix, file, storage)
   let replaced: Awaited<ReturnType<typeof imageRepository.replaceEventImageKey>>
   try {
@@ -114,7 +117,7 @@ export async function uploadEventImage(
     throw error
   }
   if (replaced.previousKey) {
-    await deleteOwnedObjectWithoutFailing(storage, replaced.previousKey, ownerPrefix)
+    await deleteOwnedObjectWithoutFailing(storage, replaced.previousKey, allowedPrefixes)
   }
   return { imageUrl: uploaded.imageUrl }
 }
@@ -127,10 +130,12 @@ export async function deleteEventImage(
   const id = await imageRepository.resolveEventImageId(eventId)
   if (!id) throw new ApiError(404, 'Event not found')
   const ownerPrefix = 'event-images/' + id
+  const publicId = await imageRepository.getEventPublicId(id)
+  const allowedPrefixes = publicId ? [ownerPrefix, `event-images/${encodeURIComponent(publicId)}`] : [ownerPrefix]
   const replaced = await imageRepository.replaceEventImageKey(id, userId, null)
   assertEventResult(replaced)
   if (replaced.previousKey) {
-    await deleteOwnedObjectWithoutFailing(storage, replaced.previousKey, ownerPrefix)
+    await deleteOwnedObjectWithoutFailing(storage, replaced.previousKey, allowedPrefixes)
   }
 }
 

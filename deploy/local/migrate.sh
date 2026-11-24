@@ -103,7 +103,6 @@ SQL
   write_step database/seeds/002_explore_demo.sql seed-explore >> "$batch"
   write_step deploy/local/seed-event.sql seed-event >> "$batch"
   printf '%s\n' '\endif' >> "$batch"
-  write_step deploy/local/demo-account-emails.sql seed-demo-account-emails >> "$batch"
 fi
 
 psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$batch"

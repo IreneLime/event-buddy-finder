@@ -1,6 +1,7 @@
 services:
   database:
     image: postgres:15-alpine
+    mem_limit: 512m
     environment:
       POSTGRES_DB: event_buddy_finder
       POSTGRES_USER: event_buddy
@@ -15,6 +16,7 @@ services:
 
   migrate:
     image: postgres:15-alpine
+    mem_limit: 512m
     working_dir: /workspace
     command: ["sh", "deploy/local/migrate.sh", "--seed"]
     environment:
@@ -26,62 +28,48 @@ services:
       database:
         condition: service_healthy
 
-  storage:
-    image: rustfs/rustfs:1.0.0-alpha.91
-    command: ["/data"]
-    environment:
-      RUSTFS_ACCESS_KEY: EVENTBUDDYLOCAL
-      RUSTFS_SECRET_KEY: local-demo-only
-      RUSTFS_ADDRESS: ":19000"
-      RUSTFS_CONSOLE_ENABLE: "false"
-    volumes:
-      - images:/data
-    ports:
-      - "127.0.0.1:5180:5173"
-      - "127.0.0.1:14001-14005:4001-4005"
-      - "127.0.0.1:19099:9099"
-      - "127.0.0.1:19000:19000"
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://127.0.0.1:19000/health"]
-      interval: 2s
-      timeout: 3s
-      retries: 30
-
   app:
+    mem_limit: 2g
     build:
       context: ../..
       dockerfile: deploy/local/Dockerfile
-    # Share loopback so presigned storage URLs use the same host in the
-    # browser and the image API. Only the ports above are published.
-    network_mode: service:storage
+    ports:
+      - "127.0.0.1:5180:5173"
+      - "127.0.0.1:14001:4001"
+      - "127.0.0.1:14002:4002"
+      - "127.0.0.1:14003:4003"
+      - "127.0.0.1:14004:4004"
+      - "127.0.0.1:14005:4005"
+    volumes:
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/dev/null}:/run/secrets/firebase-admin.json:ro
     depends_on:
       migrate:
         condition: service_completed_successfully
-      storage:
-        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://event_buddy:local-demo-only@database:5432/event_buddy_finder
       HOST: 0.0.0.0
       EVENT_BUDDY_VITE_HOST: 0.0.0.0
       WEB_ORIGIN: http://127.0.0.1:5180
       AUTH_API_URL: http://127.0.0.1:4003
+      ALLOW_DEV_AUTH: "false"
       CHAT_DEV_MODE: "false"
       CHAT_LOAD_DEMO_HISTORY: "true"
-      FIREBASE_PROJECT_ID: demo-event-buddy-local
-      FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
-      VITE_FIREBASE_API_KEY: local-demo
-      VITE_FIREBASE_AUTH_DOMAIN: localhost
-      VITE_FIREBASE_PROJECT_ID: demo-event-buddy-local
-      VITE_FIREBASE_AUTH_EMULATOR_URL: http://127.0.0.1:19099
+      FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-admin.json
+      LIVE_FIREBASE_API_KEY: ${LIVE_FIREBASE_API_KEY:-}
+      VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
+      VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
+      VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
       VITE_EVENTS_API_URL: http://127.0.0.1:14001
       VITE_CHAT_API_URL: http://127.0.0.1:14002
       VITE_USERS_API_URL: http://127.0.0.1:14004
       VITE_IMAGE_API_URL: http://127.0.0.1:14005
-      SPACES_ENDPOINT: http://127.0.0.1:19000
-      SPACES_BUCKET: event-buddy-local
-      SPACES_ACCESS_KEY_ID: EVENTBUDDYLOCAL
-      SPACES_SECRET_ACCESS_KEY: local-demo-only
-      SPACES_FORCE_PATH_STYLE: "true"
+      SPACES_ENDPOINT: ${SPACES_ENDPOINT:-}
+      SPACES_REGION: ${SPACES_REGION:-us-east-1}
+      SPACES_BUCKET: ${SPACES_BUCKET:-}
+      SPACES_ACCESS_KEY_ID: ${SPACES_ACCESS_KEY_ID:-}
+      SPACES_SECRET_ACCESS_KEY: ${SPACES_SECRET_ACCESS_KEY:-}
+      SPACES_DOWNLOAD_URL_EXPIRES_IN_SECONDS: ${SPACES_DOWNLOAD_URL_EXPIRES_IN_SECONDS:-900}
     healthcheck:
       test: ["CMD", "node", "deploy/local/health.mjs"]
       interval: 3s
@@ -90,4 +78,3 @@ services:
 
 volumes:
   database:
-  images:

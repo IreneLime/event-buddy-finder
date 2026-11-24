@@ -24,8 +24,12 @@ psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/003_realtime_
 if [ -f database/migrations/004_consolidate_schema.sql ]; then
   psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/004_consolidate_schema.sql
 fi
-
-psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/005_chat_message_notifications.sql
+if [ -f database/migrations/005_chat_message_notifications.sql ]; then
+  psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/005_chat_message_notifications.sql
+fi
+if [ -f database/migrations/006_demo_image_object_keys.sql ]; then
+  psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/006_demo_image_object_keys.sql
+fi
 
 psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/seeds/001_demo_data.sql
 psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/seeds/002_explore_demo.sql

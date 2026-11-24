@@ -44,6 +44,7 @@ export default defineConfig({
       VITE_FIREBASE_PROJECT_ID: 'demo-event-buddy',
       VITE_USE_FIREBASE_AUTH_EMULATOR: 'true',
       VITE_FIREBASE_AUTH_EMULATOR_URL: 'http://127.0.0.1:9199',
+      VITE_USE_FIREBASE_AUTH_EMULATOR: 'true',
       VITE_USERS_API_URL: 'http://127.0.0.1:4104',
       VITE_IMAGE_API_URL: 'http://127.0.0.1:4105',
       VITE_EVENTS_API_URL: 'http://127.0.0.1:4101',
