@@ -1,8 +1,13 @@
+import type { EventSummary } from '@event-buddy/contracts'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+export function isUpcomingEvent(event: Pick<EventSummary, 'status' | 'startsAt'>, now: number) {
+  return event.status === 'scheduled' && Date.parse(event.startsAt) >= now
 }
 
 export function formatEventDate(date: string) {

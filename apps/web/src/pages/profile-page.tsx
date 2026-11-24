@@ -26,10 +26,18 @@ const ageRanges = [
 export function ProfilePage() {
   const { live } = useAuth()
   const { userId } = useParams()
-  if (live || (userId && !demoUsers.some(({ id }) => id === userId))) {
-    return <Suspense fallback={<p role="status" className="p-8">Loading profile…</p>}><LiveProfilePage /></Suspense>
-  }
-  return <DemoProfilePage />
+  const { state } = useLocation()
+  const fromEventId = state?.fromEventId
+  const useLiveProfile = live || (userId && !demoUsers.some(({ id }) => id === userId))
+
+  return <>
+    {userId && typeof fromEventId === 'string' && fromEventId && <Button asChild variant="ghost" size="sm" className="mb-4">
+      <Link to={'/events/' + encodeURIComponent(fromEventId)}><ArrowLeft size={15} />Back to event</Link>
+    </Button>}
+    {useLiveProfile
+      ? <Suspense fallback={<p role="status" className="p-8">Loading profile…</p>}><LiveProfilePage /></Suspense>
+      : <DemoProfilePage />}
+  </>
 }
 
 function DemoProfilePage() {

@@ -6,6 +6,10 @@ import { AuthProvider } from '../src/state/auth-store'
 import { EventStoreProvider } from '../src/state/event-store'
 import { EventFormPage } from '../src/pages/event-form-page'
 import { EventDetailPage } from '../src/pages/event-detail-page'
+import { EventsPage } from '../src/pages/events-page'
+import { HomePage } from '../src/pages/home-page'
+import { ProfilePage } from '../src/pages/profile-page'
+import { ExploreCityProvider } from '../src/state/explore-city'
 
 const api = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), cancel: vi.fn(), participate: vi.fn() }))
 vi.mock('../src/lib/backend-api', async (importOriginal) => ({
@@ -68,6 +72,30 @@ it('places meeting notes in a separate card from the event description', async (
   const about = await screen.findByRole('heading', { name: 'About this event' })
   const notes = screen.getByRole('heading', { name: 'Where to meet & what to know' })
   expect(about.parentElement?.nextElementSibling).toBe(notes.parentElement)
+})
+
+it('returns to the same event from the organizer’s profile', async () => {
+  event = { ...event, organizerUserId: 'mina' }
+  render(<AuthProvider><EventStoreProvider><MemoryRouter initialEntries={['/events/night-market']}><Routes>
+    <Route path="/events/:eventId" element={<EventDetailPage />} />
+    <Route path="/profile/:userId" element={<ProfilePage />} />
+  </Routes></MemoryRouter></EventStoreProvider></AuthProvider>)
+  fireEvent.click(await screen.findByRole('link', { name: 'View profile' }))
+  const back = await screen.findByRole('link', { name: 'Back to event' })
+  expect(back.getAttribute('href')).toBe('/events/night-market')
+  fireEvent.click(back)
+  await screen.findByRole('heading', { name: event.title })
+})
+
+it.each([HomePage, EventsPage])('shows only upcoming events on %s', async (Page) => {
+  const upcoming = { ...event, id: 'upcoming', title: 'Upcoming market', startsAt: new Date(Date.now() + 86_400_000).toISOString() }
+  event = { ...event, startsAt: new Date(Date.now() - 86_400_000).toISOString() }
+  api.list.mockResolvedValue([event, upcoming])
+  render(<AuthProvider><EventStoreProvider><ExploreCityProvider><MemoryRouter>
+    <Page />
+  </MemoryRouter></ExploreCityProvider></EventStoreProvider></AuthProvider>)
+  await screen.findByRole('link', { name: 'View Upcoming market' })
+  expect(screen.queryByRole('link', { name: `View ${event.title}` })).toBeNull()
 })
 
 it('saves event edits through the backend without shifting time or dropping existing categories', async () => {

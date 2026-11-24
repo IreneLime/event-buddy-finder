@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, CalendarDays, Check, Clock3, Heart, MapPin, MessageCircle, Pencil, Share2, Tag, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Check, Clock3, Heart, MapPin, MessageCircle, Pencil, Tag, Users } from 'lucide-react'
 import { getEventArtwork, getEventEmoji } from '../data/mock-events'
 import { useEventDetails, useEventStore } from '../state/event-store'
 import type { EventSummary } from '@event-buddy/contracts'
@@ -69,7 +69,7 @@ function EventDetails({ loadedEvent }: { loadedEvent: EventSummary }) {
   return <div className="space-y-6">
     <div className="flex items-center justify-between">
       <Button variant="ghost" size="sm" onClick={() => navigate(-1)}><ArrowLeft size={15} />Back</Button>
-      <div className="flex gap-2"><Button variant="outline" size="sm"><Share2 size={15} /><span className="hidden sm:inline">Share</span></Button>{canEdit(event) && event.status !== 'cancelled' && <Button asChild variant="outline" size="sm"><Link to={`/events/${event.id}/edit`}><Pencil size={15} />Edit event</Link></Button>}</div>
+      {canEdit(event) && event.status !== 'cancelled' && <Button asChild variant="outline" size="sm"><Link to={`/events/${event.id}/edit`}><Pencil size={15} />Edit event</Link></Button>}
     </div>
 
     <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_350px]">
@@ -130,8 +130,8 @@ function EventDetails({ loadedEvent }: { loadedEvent: EventSummary }) {
             <Link key={person.userId} to={'/profile/' + encodeURIComponent(person.userId)} title={person.displayName}><Avatar name={person.displayName} /></Link>)}</div>}
           <div className="flex items-center gap-3 border-t border-stone-100 pt-3"><Avatar name={event.organizerName} />
             <div><p className="text-xs font-bold">{event.organizerName}</p><p className="text-[11px] text-stone-500">Event organizer</p></div>
-            {live && event.organizerUserId && <Button asChild variant="ghost" size="sm"><Link to={'/profile/' + encodeURIComponent(event.organizerUserId)}>View profile</Link></Button>}
-            {!live && demoUsers.some((person) => person.displayName === event.organizerName) && <Button asChild variant="ghost" size="sm"><Link to={'/profile/' + demoUsers.find((person) => person.displayName === event.organizerName)?.id}>View profile</Link></Button>}
+            {live && event.organizerUserId && <Button asChild variant="ghost" size="sm"><Link to={'/profile/' + encodeURIComponent(event.organizerUserId)} state={{ fromEventId: event.id }}>View profile</Link></Button>}
+            {!live && demoUsers.some((person) => person.displayName === event.organizerName) && <Button asChild variant="ghost" size="sm"><Link to={'/profile/' + demoUsers.find((person) => person.displayName === event.organizerName)?.id} state={{ fromEventId: event.id }}>View profile</Link></Button>}
           </div>
         </Card>
         <p className="flex items-center justify-center gap-1.5 text-xs text-stone-400"><Clock3 size={13} />Posted recently · Updated just now</p>
