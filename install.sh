@@ -55,7 +55,7 @@ if ! "${compose[@]}" up --build --detach --wait --wait-timeout 180 --remove-orph
   printf '%s\n' 'Startup failed. Check the logs above and stop any other app using the localhost ports.' >&2
   exit 1
 fi
-printf '%s\n' 'Open http://127.0.0.1:5180' \
+printf '%s\n' 'Open http://localhost:5180' \
   'Browse the seeded events without signing in. Register with your own email and verify it to create a profile, chat, or post events.' \
   'The seeded demo profiles are PostgreSQL display data, not Firebase login accounts.' \
   'To stop the app: ./install.sh --stop'
