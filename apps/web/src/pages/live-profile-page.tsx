@@ -204,14 +204,14 @@ function ProfileDetails({ profile, isPrivate }: { profile: UserProfile; isPrivat
       {user?.id === profile.id && !own && <Button asChild variant="outline"><Link to="/profile">My profile</Link></Button>}
     </header>
     <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <Card className="space-y-3 overflow-hidden pb-5">
+      <Card className="space-y-3 overflow-hidden pb-7">
         <div className="profile-cover h-28" />
         <div className="space-y-3 px-5">
           <ApiImage kind="profile" id={profile.id} className="relative -mt-10 size-[68px] rounded-full border-4 border-white object-cover" fallback={<Avatar name={profile.displayName} className="relative -mt-10 size-[68px] border-4 border-white text-lg" />} />
-          <h2 className="text-xl font-bold">{profile.displayName}</h2>
+          <h2 className="break-words text-2xl font-bold">{profile.displayName}</h2>
           {profile.bio && <p className="whitespace-pre-line text-sm text-stone-600">{profile.bio}</p>}
           <div className="flex flex-wrap gap-2">{profile.preferredCategories.map((category) => <Badge key={category}>{category}</Badge>)}</div>
-          {own && <div className="space-y-1 border-t border-stone-100 pt-3 text-xs text-stone-600">
+          {own && <div className="space-y-2 break-words border-t border-stone-100 pt-4 text-sm leading-6 text-stone-600">
             <p className="font-semibold">Private profile details</p><p>Email: {own.email}</p>
             {own.ageRange && <p>Age range: {ageRanges[own.ageRange]}</p>}{own.affiliation && <p>Affiliation: {own.affiliation}</p>}
           </div>}
