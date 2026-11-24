@@ -1,3 +1,4 @@
+import { notificationHref, notificationTitle } from '../lib/notification-display'
 import { useState } from 'react'
 import { Bell, CalendarDays, CheckCheck } from 'lucide-react'
 import { useNavigate } from 'react-router'
@@ -17,7 +18,7 @@ export function NotificationsPage() {
   const [error, setError] = useState('')
   const [working, setWorking] = useState(false)
   const navigate = useNavigate()
-  if (!user) return <SignInPrompt title="Sign in to view notifications" description="Your saved event updates are available after you sign in." />
+  if (!user) return <SignInPrompt title="Sign in to view notifications" description="Your saved notifications are available after you sign in." />
 
   async function action(work: () => Promise<void>) {
     setWorking(true)
@@ -26,7 +27,7 @@ export function NotificationsPage() {
     finally { setWorking(false) }
   }
   async function open(notification: NotificationItem) {
-    await action(async () => { await markNotificationRead(notification.id); navigate(`/events/${notification.eventId}`) })
+    await action(async () => { await markNotificationRead(notification.id); navigate(notificationHref(notification)) })
   }
   const visible = notifications.filter((item) => !unreadOnly || !item.readAt)
   return <div className="mx-auto max-w-3xl space-y-6">
@@ -36,8 +37,8 @@ export function NotificationsPage() {
     {(error || loadError) && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error || loadError}<Button variant="ghost" size="sm" onClick={() => void refresh()}>Retry</Button></div>}
     <Card className="divide-y divide-stone-100 overflow-hidden">
       {loading && <p role="status" className="p-8 text-center text-stone-500">Loading notifications…</p>}
-      {visible.map((notification) => <button key={notification.id} disabled={working} onClick={() => void open(notification)} className={`flex w-full items-start gap-3 p-5 text-left hover:bg-brand-50/60 ${notification.readAt ? '' : 'bg-brand-50/40'}`}><CalendarDays size={20} className={`mt-1 shrink-0 ${notification.kind === 'event_cancelled' ? 'text-rose-700' : 'text-brand-700'}`} /><span className="min-w-0 flex-1"><span className="block text-sm font-bold">{notification.eventTitle ?? 'Event update'}</span><span className="mt-1 block text-sm leading-6 text-stone-600">{notification.message}</span><time dateTime={notification.createdAt} className="mt-2 block text-xs text-stone-400">{new Date(notification.createdAt).toLocaleString()}</time></span>{!notification.readAt && <span aria-label="Unread" className="mt-2 size-2 shrink-0 rounded-full bg-brand-600" />}</button>)}
-      {!loading && !visible.length && <p className="p-10 text-center text-sm text-stone-500">{unreadOnly ? 'No unread notifications.' : 'No event updates yet. Mark an event Interested or Going to receive its updates.'}</p>}
+      {visible.map((notification) => <button key={notification.id} disabled={working} onClick={() => void open(notification)} className={`flex w-full items-start gap-3 p-5 text-left hover:bg-brand-50/60 ${notification.readAt ? '' : 'bg-brand-50/40'}`}><CalendarDays size={20} className={`mt-1 shrink-0 ${notification.kind === 'event_cancelled' ? 'text-rose-700' : 'text-brand-700'}`} /><span className="min-w-0 flex-1"><span className="block text-sm font-bold">{notification.eventTitle ?? notificationTitle(notification)}</span><span className="mt-1 block text-sm leading-6 text-stone-600">{notification.message}</span><time dateTime={notification.createdAt} className="mt-2 block text-xs text-stone-400">{new Date(notification.createdAt).toLocaleString()}</time></span>{!notification.readAt && <span aria-label="Unread" className="mt-2 size-2 shrink-0 rounded-full bg-brand-600" />}</button>)}
+      {!loading && !visible.length && <p className="p-10 text-center text-sm text-stone-500">{unreadOnly ? 'No unread notifications.' : 'No notifications yet.'}</p>}
     </Card>
     {nextNotificationCursor && <div className="text-center"><Button variant="outline" disabled={working} onClick={() => void action(loadMoreNotifications)}>Load earlier notifications</Button></div>}
   </div>

@@ -13,6 +13,7 @@ psql "$DATABASE_URL" -f database/migrations/001_initial_schema.sql
 psql "$DATABASE_URL" -f database/migrations/002_event_city_and_notes.sql
 psql "$DATABASE_URL" -f database/migrations/003_realtime_event_notifications.sql
 psql "$DATABASE_URL" -f database/migrations/004_consolidate_schema.sql
+psql "$DATABASE_URL" -f database/migrations/005_chat_message_notifications.sql
 pnpm --filter @event-buddy/database db:generate
 pnpm --filter @event-buddy/database db:seed
 ```
