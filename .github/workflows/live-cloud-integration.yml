@@ -125,7 +125,7 @@ jobs:
           done
       - name: Exercise Firebase, app APIs, PostgreSQL, and Spaces
         run: pnpm test:live-cloud
-      - name: Upload and verify the three mock event photos through the image API
+      - name: Upload and verify all 22 seeded event photos through the image API
         run: pnpm --filter @event-buddy/image-api exec tsx scripts/publish-demo-images.ts --cleanup
       - name: Print service logs on failure
         if: failure()

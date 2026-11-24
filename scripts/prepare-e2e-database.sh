@@ -29,3 +29,4 @@ psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/005_chat_mess
 
 psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/seeds/001_demo_data.sql
 psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/seeds/002_explore_demo.sql
+psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f deploy/local/seed-event.sql
