@@ -1,5 +1,6 @@
 import { ArrowRight, CalendarDays, Compass, Users } from 'lucide-react'
 import { Link } from 'react-router'
+import { isUpcomingEvent } from '../lib/utils'
 import { useEventStore } from '../state/event-store'
 import { useExploreCity } from '../state/explore-city'
 import { EventCard } from '../components/event-card'
@@ -16,8 +17,9 @@ const ideas = [
 export function HomePage() {
   const { events, loading, error, retry } = useEventStore()
   const { city } = useExploreCity()
+  const now = Date.now()
   const featured = events
-    .filter((event) => event.status === 'scheduled' && (event.city ?? 'Toronto') === city)
+    .filter((event) => isUpcomingEvent(event, now) && (event.city ?? 'Toronto') === city)
     .sort((a, b) => b.participantCount - a.participantCount)
     .slice(0, 3)
 

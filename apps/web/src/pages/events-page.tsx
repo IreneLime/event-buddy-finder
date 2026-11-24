@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, ListFilter, MapPin, Search, SlidersHorizontal, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import type { EventSummary } from '@event-buddy/contracts'
+import { isUpcomingEvent } from '../lib/utils'
 import { useEventStore } from '../state/event-store'
 import { EventCard } from '../components/event-card'
 import { Button } from '../components/ui/button'
@@ -67,29 +68,31 @@ export function EventsPage() {
   const [sort, setSort] = useState<SortMode>('soonest')
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const now = new Date()
+  const upcomingInCity = useMemo(() => events.filter((event) =>
+    (event.city ?? 'Toronto') === city && isUpcomingEvent(event, now.getTime()),
+  ), [city, events, now])
 
   const visibleEvents = useMemo(() => {
     const search = query.trim().toLowerCase()
-    const filtered = events.filter((event) => {
+    const filtered = upcomingInCity.filter((event) => {
       const matchesCategory = category === 'All events' || event.categoryNames.includes(category)
-      const matchesCity = (event.city ?? 'Toronto') === city
       const searchable = `${event.title} ${event.description} ${event.locationName} ${event.address ?? ''} ${event.categoryNames.join(' ')}`.toLowerCase()
       const matchesLocation = !location.trim() || `${event.locationName} ${event.address ?? ''}`.toLowerCase().includes(location.trim().toLowerCase())
       const startsAt = new Date(event.startsAt)
-      const matchesDate = dateFilter === 'any' || (dateFilter === 'week' ? startsAt >= now && startsAt <= new Date(now.getTime() + 7 * 86400000) : startsAt.getMonth() === now.getMonth() && startsAt.getFullYear() === now.getFullYear())
+      const matchesDate = dateFilter === 'any' || (dateFilter === 'week' ? startsAt <= new Date(now.getTime() + 7 * 86400000) : startsAt.getMonth() === now.getMonth() && startsAt.getFullYear() === now.getFullYear())
       const matchesPrice = priceFilter === 'any' || (priceFilter === 'free' ? (event.priceAmount ?? 0) === 0 : (event.priceAmount ?? 0) > 0)
-      return event.status === 'scheduled' && matchesCity && matchesCategory && searchable.includes(search) && matchesLocation && matchesDate && matchesPrice
+      return matchesCategory && searchable.includes(search) && matchesLocation && matchesDate && matchesPrice
     })
     return filtered.sort((a, b) => sort === 'popular' ? b.participantCount - a.participantCount : sort === 'price' ? (a.priceAmount ?? 0) - (b.priceAmount ?? 0) : new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
-  }, [category, city, dateFilter, events, location, now, priceFilter, query, sort])
+  }, [category, dateFilter, location, now, priceFilter, query, sort, upcomingInCity])
 
   const suggestions = useMemo(() => {
     const search = query.trim().toLowerCase()
     if (!search) return { matchingEvents: [], matchingCategories: [] }
-    const matchingEvents = events.filter((event) => event.status === 'scheduled' && (event.city ?? 'Toronto') === city && `${event.title} ${event.locationName} ${event.categoryNames.join(' ')}`.toLowerCase().includes(search)).slice(0, 4)
+    const matchingEvents = upcomingInCity.filter((event) => `${event.title} ${event.locationName} ${event.categoryNames.join(' ')}`.toLowerCase().includes(search)).slice(0, 4)
     const matchingCategories = categories.filter((item) => item !== 'All events' && item.toLowerCase().includes(search)).slice(0, 2)
     return { matchingEvents, matchingCategories }
-  }, [categories, city, events, query])
+  }, [categories, query, upcomingInCity])
 
   const calendarEvents = visibleEvents.filter((event) => {
     const date = new Date(event.startsAt)
@@ -136,7 +139,7 @@ export function EventsPage() {
       {loading ? <p role="status" className="py-12 text-center">Loading events…</p>
         : error ? <div role="alert" className="py-12 text-center">{error} <Button variant="outline" onClick={retry}>Try again</Button></div>
         : view === 'map' ? <Suspense fallback={<div className="grid min-h-[420px] place-items-center rounded-2xl border border-stone-200 bg-stone-50 text-sm text-stone-500">Loading interactive map…</div>}><EventsMap events={visibleEvents} city={city} /></Suspense>
-        : visibleEvents.length === 0 ? <div className="rounded-2xl border border-dashed border-stone-300 bg-white px-6 py-14 text-center"><p className="font-semibold text-stone-800">{events.some((event) => (event.city ?? 'Toronto') === city) ? 'No events match those filters.' : `No events in ${city} yet.`}</p><p className="mt-1 text-sm text-stone-500">{events.some((event) => (event.city ?? 'Toronto') === city) ? 'Try a different keyword, location, or date range.' : 'Choose another city to explore available events.'}</p><Button variant="secondary" size="sm" className="mt-4" onClick={clearFilters}>Clear filters</Button></div>
+        : visibleEvents.length === 0 ? <div className="rounded-2xl border border-dashed border-stone-300 bg-white px-6 py-14 text-center"><p className="font-semibold text-stone-800">{upcomingInCity.length > 0 ? 'No events match those filters.' : `No events in ${city} yet.`}</p><p className="mt-1 text-sm text-stone-500">{upcomingInCity.length > 0 ? 'Try a different keyword, location, or date range.' : 'Choose another city to explore available events.'}</p><Button variant="secondary" size="sm" className="mt-4" onClick={clearFilters}>Clear filters</Button></div>
           : view === 'cards' ? <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{visibleEvents.map((event) => <EventCard event={event} key={event.id} />)}</div>
             : <CalendarView events={visibleEvents} month={month} onMonthChange={setMonth} />}
     </section>
