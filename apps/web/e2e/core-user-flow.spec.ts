@@ -31,7 +31,11 @@ function monitorUnexpectedApiErrors(page: Page, errors: string[]) {
     const expectedGuestAuthRejection = response.status() === 401 &&
       url.port === '4102' && ['/ListGroupChats', '/me/notifications'].includes(url.pathname)
     const expectedMissingCloudImage = url.port === '4105' && [404, 503].includes(response.status())
-    if (response.status() >= 400 && !expectedProfileNotCreatedYet && !expectedGuestAuthRejection && !expectedMissingCloudImage) {
+    // Socket.IO may answer an in-flight polling request with 400 after its
+    // client has already closed that session during navigation/unmount.
+    const closedSocketPoll = response.status() === 400 &&
+      url.pathname === '/socket.io/' && url.searchParams.has('sid')
+    if (response.status() >= 400 && !expectedProfileNotCreatedYet && !expectedGuestAuthRejection && !expectedMissingCloudImage && !closedSocketPoll) {
       errors.push(`${response.status()} ${url.pathname}`)
     }
   })
