@@ -26,12 +26,22 @@ function monitorUnexpectedApiErrors(page: Page, errors: string[]) {
     if (!backendPorts.has(url.port)) return
     // Missing profiles are expected between Firebase signup and profile setup;
     // missing/unconfigured cloud images use the image API's fallback path.
+    // Engine.IO returns 400 when a long-poll arrives after the socket session
+    // was closed (client navigation / reconnect). That is transport noise.
     const expectedProfileNotCreatedYet = response.status() === 404 &&
       url.port === '4104' && url.pathname === '/me/profile'
     const expectedGuestAuthRejection = response.status() === 401 &&
       url.port === '4102' && ['/ListGroupChats', '/me/notifications'].includes(url.pathname)
     const expectedMissingCloudImage = url.port === '4105' && [404, 503].includes(response.status())
-    if (response.status() >= 400 && !expectedProfileNotCreatedYet && !expectedGuestAuthRejection && !expectedMissingCloudImage) {
+    const expectedSocketIoTransportError = response.status() === 400 &&
+      url.port === '4102' && url.pathname === '/socket.io/'
+    if (
+      response.status() >= 400 &&
+      !expectedProfileNotCreatedYet &&
+      !expectedGuestAuthRejection &&
+      !expectedMissingCloudImage &&
+      !expectedSocketIoTransportError
+    ) {
       errors.push(`${response.status()} ${url.pathname}`)
     }
   })
@@ -147,8 +157,14 @@ test('two verified users discover, join, chat about, and cancel an event', async
     await expect(host.page.getByText('Event cancelled.')).toBeVisible()
 
     await expect(attendee.page.getByRole('status').filter({ hasText: 'Event cancelled' })).toBeVisible({ timeout: 15_000 })
-    await attendee.page.goto('/notifications')
-    await expect(attendee.page.getByText(`${eventTitle} has been cancelled.`)).toBeVisible()
+    // Prefer in-app navigation so the live chat socket is reused instead of
+    // tearing down Engine.IO mid-poll during a full document load.
+    await attendee.page.getByRole('button', { name: /Notifications/ }).click()
+    await attendee.page.getByRole('link', { name: 'View all notifications & settings' }).click()
+    await expect(attendee.page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible()
+    await expect(
+      attendee.page.getByRole('main').getByText(`${eventTitle} has been cancelled.`),
+    ).toBeVisible()
 
     expect(apiErrors, 'The browser flow should not receive unexpected backend API failures').toEqual([])
   } finally {

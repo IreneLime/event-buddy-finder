@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test src/config/env.test.ts src/modules/events/event.filters.test.ts src/smoke/guest-browse.test.ts tests/*.test.ts",
-    "test:notifications": "REQUIRE_EVENT_NOTIFICATION_TESTS=true tsx --test tests/event-notifications.test.ts"
+    "test:notifications": "REQUIRE_EVENT_NOTIFICATION_TESTS=true tsx --test tests/event-notifications.test.ts",
+    "test:rejected-mutations": "REQUIRE_REJECTED_MUTATION_TESTS=true tsx --test tests/rejected-event-mutations.test.ts"
   },
   "dependencies": {
     "@event-buddy/contracts": "workspace:*",

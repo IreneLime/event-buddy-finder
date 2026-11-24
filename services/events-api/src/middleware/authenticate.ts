@@ -29,20 +29,33 @@ function ensureFirebase(): boolean {
   return true
 }
 
-async function resolveBearer(token: string): Promise<{ userId: string; emailVerified: boolean }> {
-  if (token.startsWith('dev:')) {
-    if (!env.allowDevAuth) {
-      throw new ApiError(
-        401,
-        'Development auth is disabled. Set ALLOW_DEV_AUTH=true locally without FIREBASE_PROJECT_ID, or use a Firebase ID token.',
-      )
-    }
+function resolveDevBearer(
+  token: string,
+  prefix: 'dev:' | 'dev-unverified:',
+  emailVerified: boolean,
+): { userId: string; emailVerified: boolean } {
+  if (!env.allowDevAuth) {
+    throw new ApiError(
+      401,
+      'Development auth is disabled. Set ALLOW_DEV_AUTH=true locally without FIREBASE_PROJECT_ID, or use a Firebase ID token.',
+    )
+  }
 
-    const userId = token.slice('dev:'.length).trim()
-    if (!userId) {
-      throw new ApiError(401, 'Invalid development auth token')
-    }
-    return { userId, emailVerified: true }
+  const userId = token.slice(prefix.length).trim()
+  if (!userId) {
+    throw new ApiError(401, 'Invalid development auth token')
+  }
+  return { userId, emailVerified }
+}
+
+async function resolveBearer(token: string): Promise<{ userId: string; emailVerified: boolean }> {
+  // Local stand-ins for Firebase ID tokens: verified (`dev:`) and unverified (`dev-unverified:`).
+  if (token.startsWith('dev-unverified:')) {
+    return resolveDevBearer(token, 'dev-unverified:', false)
+  }
+
+  if (token.startsWith('dev:')) {
+    return resolveDevBearer(token, 'dev:', true)
   }
 
   if (!ensureFirebase()) {

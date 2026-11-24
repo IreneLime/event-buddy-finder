@@ -31,6 +31,7 @@ jobs:
       REQUIRE_EVENT_MEMBERSHIP_TESTS: 'true'
       REQUIRE_CHAT_PERSISTENCE_TESTS: 'true'
       REQUIRE_EVENT_NOTIFICATION_TESTS: 'true'
+      REQUIRE_REJECTED_MUTATION_TESTS: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
