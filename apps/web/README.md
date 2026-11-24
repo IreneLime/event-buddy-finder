@@ -25,7 +25,7 @@ chat and user APIs described below.
    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/seeds/002_explore_demo.sql
    ```
    Together, the seeds add 20 fictional profiles, 20 events, participation history, and sample chat messages. These rows are separate from Firebase accounts and are for local development only. `001_demo_images.sql` only adds object-key references; use it only after the corresponding image files have been uploaded to the configured Spaces bucket.
-3. Start `pnpm dev:auth`, `pnpm dev:users`, `pnpm dev:images`, and `pnpm dev:events` in separate terminals. They use the same Firebase project, PostgreSQL database, and repository-root `.env`. Set `WEB_ORIGIN` to the frontend origin if you change ports. For the Firebase Auth Emulator, set the browser emulator URL and `FIREBASE_AUTH_EMULATOR_HOST` in the root `.env`.
+3. Start `pnpm dev:auth`, `pnpm dev:users`, `pnpm dev:images`, and `pnpm dev:events` in separate terminals. They use the same Firebase project, PostgreSQL database, and repository-root `.env`. Set `WEB_ORIGIN` to the frontend origin if you change ports. To opt into the Firebase Auth Emulator, set `VITE_USE_FIREBASE_AUTH_EMULATOR=true`, set `VITE_FIREBASE_AUTH_EMULATOR_URL` for the browser, and set `FIREBASE_AUTH_EMULATOR_HOST` for the backend in the root `.env`. The browser ignores the emulator URL while the opt-in flag is false.
 4. Start `pnpm dev:web`. Register, verify your email, and use **I’ve verified my email** to refresh your session. Submit the profile form to create your PostgreSQL profile. To check the public sample profile, open `/profile/demo-profile-user`.
 5. For Firebase-backed chat, start `CHAT_DEV_MODE=false pnpm dev:chat` with the same `DATABASE_URL`, `WEB_ORIGIN`, and `AUTH_API_URL` pointing to your running auth service. For the seeded local demo identities, use `CHAT_DEV_MODE=true pnpm dev:chat`; this bypass is for development only. `VITE_CHAT_API_URL` points the browser at chat-api. Open `/chats` or `/notifications` after setting up a profile.
 6. Set `VITE_EVENTS_API_URL` in the root `.env` and restart the web app to browse the PostgreSQL-seeded events. Public profiles use the seeded rows when the users API is running. Clear `VITE_EVENTS_API_URL` to return to the frontend-only fixtures.
@@ -42,10 +42,15 @@ also available at `/profile/demo-cathy`, `/profile/demo-mina`,
 `/profile/demo-alex`, and `/profile/demo-nadia`.
 
 For a hosted Firebase preview, leave `VITE_FIREBASE_AUTH_EMULATOR_URL` and
-`FIREBASE_AUTH_EMULATOR_HOST` unset, use the preview project's Firebase web
+`FIREBASE_AUTH_EMULATOR_HOST` unset and keep `VITE_USE_FIREBASE_AUTH_EMULATOR=false`, use the preview project's Firebase web
 configuration and server credentials, and register real test accounts with
 passwords that meet the project's policy. Registration assigns the Firebase UID;
 the profile form creates the matching PostgreSQL row.
+
+`VITE_EMAIL_VERIFICATION_CONTINUE_URL` is passed to Firebase when registration
+or a resend creates an email-verification link. Set it to the route users should
+return to after verification, and add that URL's domain to the Firebase
+Authentication authorized-domain list.
 
 The database demo seed includes event and direct-chat messages. The chat API
 reads and writes those messages in PostgreSQL, so they remain available after a
