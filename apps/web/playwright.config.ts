@@ -42,6 +42,7 @@ export default defineConfig({
       VITE_FIREBASE_API_KEY: 'event-buddy-e2e-api-key',
       VITE_FIREBASE_AUTH_DOMAIN: 'localhost',
       VITE_FIREBASE_PROJECT_ID: 'demo-event-buddy',
+      VITE_USE_FIREBASE_AUTH_EMULATOR: 'true',
       VITE_FIREBASE_AUTH_EMULATOR_URL: 'http://127.0.0.1:9199',
       VITE_USERS_API_URL: 'http://127.0.0.1:4104',
       VITE_IMAGE_API_URL: 'http://127.0.0.1:4105',

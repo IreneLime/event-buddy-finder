@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { Navigate, useLocation } from 'react-router'
 import { createUserWithEmailAndPassword, onIdTokenChanged, reload, sendEmailVerification, signInWithEmailAndPassword, signOut as firebaseSignOut, type User } from 'firebase/auth'
 import { demoUsers } from '../data/demo-users'
-import { firebaseAuth } from '../lib/firebase'
+import { emailVerificationActionCodeSettings, firebaseAuth } from '../lib/firebase'
 
 interface Account {
   id: string
@@ -83,9 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!firebaseAuth) throw new Error('Firebase is not configured.')
       const { user } = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password)
       setUser(account(user))
-      await sendEmailVerification(user)
+      await sendEmailVerification(user, emailVerificationActionCodeSettings)
     },
-    sendVerification: () => sendEmailVerification(currentFirebaseUser()),
+    sendVerification: () => sendEmailVerification(
+      currentFirebaseUser(),
+      emailVerificationActionCodeSettings,
+    ),
     refreshVerification: async () => {
       const current = currentFirebaseUser()
       await reload(current)
