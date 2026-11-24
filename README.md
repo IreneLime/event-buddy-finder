@@ -1,50 +1,58 @@
 # Event Buddy Finder
 
-Event Buddy Finder helps people discover local events, express interest or mark themselves as going, and meet other attendees through event chat.
+Event Buddy Finder is a course project for discovering local events and finding people to attend with. The repository is organized as a pnpm workspace so frontend and backend work can proceed in parallel.
 
-## Architecture
+## Project layout
 
-The application uses a React and TypeScript frontend with separate Express and TypeScript services for authentication, profiles, events, chat and notifications, and images. Firebase Authentication manages accounts and email verification. The services use PostgreSQL for application records and DigitalOcean Spaces for private image objects; image object keys are stored with the related profile or event, and the image API returns expiring signed URLs for display.
+```text
+apps/web/                  React + TypeScript frontend
+services/auth-api/         Express + TypeScript authentication service shell
+services/user-api/         Express + TypeScript user profile service
+services/events-api/       Express + TypeScript event service shell
+services/chat-api/         Express + TypeScript chat/notification service shell
+services/image-api/        Express + TypeScript profile/event image service
+packages/contracts/        Shared TypeScript domain and API types
+packages/storage/          Shared DigitalOcean Spaces-compatible client
+database/migrations/       PostgreSQL schema migrations
+```
 
-![Application architecture](images/architecture.png)
+The user service implements PostgreSQL-backed profile endpoints and delegates Bearer-token verification to the auth service. Chat adds Socket.IO messaging, a refreshed interface, and event notifications. Event chat membership reads the authoritative PostgreSQL event/RSVP records owned by events-api.
 
-See the [project proposal](docs/event-buddy-finder-proposal.md), [database overview](docs/database-overview.md), and [database setup](database/README.md) for design details.
+The frontend retains demo sign-in. Apply migrations 001–004 and use the same database URL across services to run the integrated event, chat, and notification flows. Migration 004 consolidates the schema to six application tables; see [database setup](database/README.md).
 
-## Run locally
+## Get started
 
-For a preloaded local demo, start Docker and run `./install.sh`. See the [local setup guide](docs/deployment/README.md) for the URL and demo accounts. For manual service setup, see the [web app setup guide](apps/web/README.md).
+For a preloaded local demo, start Docker and run `./install.sh`. See the [local setup guide](docs/deployment/README.md) for the URL and demo accounts.
 
-Requirements for manual setup: Node.js 20.19 or newer, pnpm 11, PostgreSQL, and a Firebase project or Auth Emulator. The web guide covers environment variables, migrations, demo data, and service startup. Database schema and optional seeded event data are documented in the [database guide](database/README.md).
-
-At a high level:
+Requirements: Node.js 20.19+ and pnpm.
 
 ```sh
 pnpm install
-# Configure service and frontend environment variables as described in the setup guide.
-# Apply database/migrations/001–004 and optionally load database/seeds/001–002.
 pnpm dev
 ```
 
-The frontend is available at `http://localhost:5173`. Use `pnpm build`, `pnpm typecheck`, `pnpm test:unit`, and `pnpm test:e2e` to build and verify the workspace. GitHub Actions runs build/typecheck, PostgreSQL-backed unit/service tests, and the Chromium end-to-end flow on pull requests and pushes to `main`.
+The frontend runs at `http://localhost:5173`, the auth service at `http://localhost:4003`, the user service at `http://localhost:4004`, the event service at `http://localhost:4001`, the chat/notification service at `http://localhost:4002`, and the image service at `http://localhost:4005`. Health checks are available at `/health` on each service.
 
-## User guide
+Run just one app with `pnpm dev:web`, `pnpm dev:auth`, `pnpm dev:users`, `pnpm dev:events`, `pnpm dev:chat`, or `pnpm dev:images`. Use `pnpm build` and `pnpm typecheck` before opening a pull request.
 
-Browse public events without signing in. Register and verify an email address to complete a profile and post events. Signed-in users can mark an event as interested or going; interested and going users can access its group chat. Event creators can edit or cancel their events. The chat and notification services store messages and alerts in PostgreSQL and deliver live updates through Socket.IO. Profile and event photos are uploaded through the image API and served using temporary signed URLs.
+## Frontend routes
 
-For local demo accounts, mock events, and image setup, follow the [frontend guide](apps/web/README.md) and [image API guide](services/image-api/README.md#development-demo-images). Demo records are fictional and are not Firebase accounts. The optional live Firebase and Spaces checks are described in [live cloud testing](docs/live-cloud-testing.md); they require a dedicated non-production project, bucket, and GitHub environment secrets.
+- `/login` — sign-in and registration screen (presentation only)
+- `/events` — search and browse public events
+- `/events/:eventId` — event details and interest/going controls
+- `/events/new` and `/events/:eventId/edit` — shared create/edit event form
+- `/chats` and `/chats/:conversationId` — conversation list and chat view
+- `/notifications` — saved event alerts and browser notification settings
+- `/profile` and `/profile/:userId` — profile view; edit profile is linked from the current user's page
 
-## API reference
-
-- [Authentication API](services/auth-api/README.md)
-- [User profiles API](services/user-api/README.md)
-- [Events and participation API](services/events-api/README.md)
-- [Chat and notifications API](services/chat-api/README.md)
-- [Images API](services/image-api/README.md)
+Event participation, notifications, conversations, and messages use the consolidated PostgreSQL schema. Chat messages persist across service restarts; access is checked against the current event RSVP or direct-chat participants. See [real-time event notifications](docs/realtime-event-notifications.md) and [chat persistence](services/chat-api/README.md).
 
 ## Contributing
 
-Create a focused branch from the latest `main`. Keep frontend code in `apps/web`, service code in `services`, shared request and response types in `packages/contracts`, and database changes in `database`. Never commit credentials. Use the API and service READMEs above when changing an endpoint, and run the checks listed under [Run locally](#run-locally).
+1. Pull the latest `main` and create a focused feature branch.
+2. Keep feature code in its app or service. Put shared request/response and domain types in `packages/contracts`.
+3. Agree on API paths and payloads in the shared contracts before implementing an integration across frontend and backend.
+4. Do not commit credentials. Start from `.env.example` and keep secrets in an untracked `.env`.
+5. Run `pnpm build` and `pnpm typecheck` before requesting review.
 
-## Video demo
-
-The team-recorded, narrated submission demo is still to be added. It should show event discovery, a verified sign-in, event participation, an image upload, chat, and an event notification.
+Each area has a short README with its current scope and next integration steps.
