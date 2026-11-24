@@ -57,6 +57,19 @@ function mountCreate() {
   </Routes></MemoryRouter></EventStoreProvider></AuthProvider>)
 }
 
+it.each([[0, 'Free'], [12, '$12']] as const)('shows the event price for %s', async (priceAmount, label) => {
+  event = { ...event, priceAmount }
+  mount(false)
+  expect(await screen.findByText(label, { exact: true })).toBeTruthy()
+})
+
+it('places meeting notes in a separate card from the event description', async () => {
+  mount(false)
+  const about = await screen.findByRole('heading', { name: 'About this event' })
+  const notes = screen.getByRole('heading', { name: 'Where to meet & what to know' })
+  expect(about.parentElement?.nextElementSibling).toBe(notes.parentElement)
+})
+
 it('saves event edits through the backend without shifting time or dropping existing categories', async () => {
   mount(true)
   const title = await screen.findByDisplayValue(event.title)

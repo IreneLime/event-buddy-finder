@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, CalendarDays, Check, Clock3, Heart, MapPin, MessageCircle, Pencil, Share2, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Check, Clock3, Heart, MapPin, MessageCircle, Pencil, Share2, Tag, Users } from 'lucide-react'
 import { getEventArtwork, getEventEmoji } from '../data/mock-events'
 import { useEventDetails, useEventStore } from '../state/event-store'
 import type { EventSummary } from '@event-buddy/contracts'
@@ -84,15 +84,19 @@ function EventDetails({ loadedEvent }: { loadedEvent: EventSummary }) {
           <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-stone-500">
             <span className="flex items-center gap-2"><CalendarDays size={16} className="text-brand-600" />{formatEventDate(event.startsAt)}</span>
             <span className="flex items-center gap-2"><MapPin size={16} className="text-brand-600" />{event.locationName}{event.city ? ` · ${event.city}` : ''}</span>
+            <span className="flex items-center gap-2"><Tag aria-hidden="true" size={16} className="text-brand-600" />{event.priceAmount ? `$${event.priceAmount}` : 'Free'}</span>
           </div>
         </section>
         <Card className="p-5 sm:p-6">
           <h2 className="text-base font-bold text-stone-900">About this event</h2>
           <p className="mt-3 whitespace-pre-line text-sm leading-7 text-stone-600">{event.description}</p>
-          {event.notes && <div className="mt-5 rounded-2xl bg-brand-50/70 p-4 sm:p-5"><h3 className="text-sm font-bold text-stone-800">Where to meet & what to know</h3><p className="mt-2 whitespace-pre-line text-sm leading-6 text-stone-600">{event.notes}</p></div>}
         </Card>
+        {event.notes && <Card className="p-5 sm:p-6">
+          <h2 className="text-base font-bold text-stone-900">Where to meet & what to know</h2>
+          <p className="mt-3 whitespace-pre-line text-sm leading-7 text-stone-600">{event.notes}</p>
+        </Card>}
         <Card className="overflow-hidden">
-          <div className="flex items-center justify-between p-5 sm:p-6"><div><h2 className="text-base font-bold text-stone-900">Where to meet</h2><p className="mt-1 text-sm text-stone-500">{event.address ?? event.locationName}</p></div><MapPin className="text-brand-600" size={20} /></div>
+          <div className="flex items-center justify-between p-5 sm:p-6"><div><h2 className="text-base font-bold text-stone-900">Venue map</h2>{event.address && event.address !== event.locationName && <p className="mt-1 text-sm text-stone-500">{event.address}</p>}</div><MapPin className="text-brand-600" size={20} /></div>
           <div className="border-t border-stone-100"><Suspense fallback={<div className="grid h-[300px] place-items-center bg-brand-50 text-sm text-stone-500">Loading map…</div>}><EventMapPreview event={event} /></Suspense><p className="px-5 py-2 text-[10px] text-stone-400">Map data © <a className="underline hover:text-brand-700" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a></p></div>
         </Card>
       </div>
