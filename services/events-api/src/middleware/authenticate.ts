@@ -11,7 +11,9 @@ function ensureFirebase(): boolean {
   }
 
   if (getApps().length === 0) {
-    if (env.firebaseClientEmail && env.firebasePrivateKey) {
+    if (process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+      initializeApp({ projectId: env.firebaseProjectId })
+    } else if (env.firebaseClientEmail && env.firebasePrivateKey) {
       initializeApp({
         credential: cert({
           projectId: env.firebaseProjectId,

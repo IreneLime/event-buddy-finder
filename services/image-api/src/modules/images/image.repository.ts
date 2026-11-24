@@ -45,6 +45,14 @@ export async function resolveEventImageId(eventId: string): Promise<string | und
   return result.rows[0]?.id
 }
 
+export async function getEventPublicId(eventId: string): Promise<string | null | undefined> {
+  const result = await pool.query<{ public_id: string | null }>(
+    `SELECT public_id FROM events WHERE id = $1`,
+    [eventId],
+  )
+  return result.rows[0]?.public_id
+}
+
 export async function getEventImageKey(eventId: string): Promise<string | null | undefined> {
   const result = await pool.query<{ image_object_key: string | null }>(
     `SELECT image_object_key FROM events WHERE id = $1`,

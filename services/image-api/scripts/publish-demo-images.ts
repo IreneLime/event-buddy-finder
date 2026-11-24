@@ -18,7 +18,7 @@ const serviceAccount = JSON.parse(serviceAccountJson) as {
   client_email: string
   private_key: string
 }
-if (!projectId.endsWith('-ci')) throw new Error('Demo image publishing requires a dedicated Firebase project ending in -ci.')
+if (!projectId.endsWith('-ci')) throw new Error('Demo image publishing through Firebase requires a dedicated Firebase project ending in -ci.')
 if (serviceAccount.project_id !== projectId) throw new Error('Firebase service account project does not match FIREBASE_PROJECT_ID.')
 
 const keep = process.argv.includes('--keep')
@@ -81,7 +81,7 @@ const uploaded: Array<{ eventId: string; token: string }> = []
 async function jsonRequest<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options)
   const body = await response.json().catch(() => null) as Record<string, unknown> | null
-  if (!response.ok) throw new Error(`${options?.method ?? 'GET'} ${new URL(url).pathname} returned ${response.status}: ${String(body?.error ?? body?.message ?? 'request failed')}`)
+  if (!response.ok) throw new Error(`${options?.method ?? 'GET'} ${new URL(url).pathname} returned ${response.status}: ${JSON.stringify(body?.error ?? body?.message ?? 'request failed')}`)
   return body as T
 }
 

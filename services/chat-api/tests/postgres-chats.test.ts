@@ -36,7 +36,7 @@ describe('PostgreSQL chat persistence', { skip: !process.env.TEST_DATABASE_URL, 
     url.pathname = `/${name}`
     databaseUrl = url.toString()
     database = new pg.Pool({ connectionString: databaseUrl })
-    for (const migration of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql', '004_consolidate_schema.sql', '005_chat_message_notifications.sql']) {
+for (const migration of ['001_initial_schema.sql', '002_event_city_and_notes.sql', '003_realtime_event_notifications.sql', '004_consolidate_schema.sql', '005_chat_message_notifications.sql', '006_demo_image_object_keys.sql']) {
       await database.query(await readFile(new URL(`../../../database/migrations/${migration}`, import.meta.url), 'utf8'))
     }
   })
